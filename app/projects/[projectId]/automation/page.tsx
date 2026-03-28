@@ -8,7 +8,7 @@ export default function AutomationPage({ params }: { params: { projectId: string
   if (!project) return notFound();
 
   return (
-    <AppShell>
+    <AppShell project={project}>
       <div className="space-y-6">
         <SectionHeader eyebrow="Automation" title={`${project.name} starter governance kit`} description="Policy files, CI templates and automation rules that make governance enforceable instead of optional." />
         <div className="grid gap-4 md:grid-cols-2">

@@ -21,6 +21,7 @@ export interface IntegrationRef {
 export interface ReleaseItem {
   id: string;
   version: string;
+  stage?: "released" | "unreleased";
   surfaces: Surface[];
   shippedAt: string;
   backendChanged: boolean;
@@ -36,6 +37,12 @@ export interface ReleaseItem {
 export interface CapabilityRecord {
   id: string;
   name: string;
+  description?: string;
+  technicalNotes?: string;
+  channel?: string;
+  tenant?: string;
+  implementationStatus?: string;
+  deployStatus?: string;
   statusBySurface: Partial<Record<Surface, CapabilityStatus>>;
   parityStatus: "aligned" | "follow-up-required" | "planned";
   integrations: string[];

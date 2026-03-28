@@ -11,7 +11,7 @@ export default function ProjectsPage() {
         <SectionHeader
           eyebrow="Workspace"
           title={tenant.name}
-          description="Choose a governed product project. The application is multi-tenant and the Hobbeast project is only the first seeded workspace entry."
+          description="Choose a governed product project. Project-scoped navigation becomes available after you select a project."
           actions={<StatusBadge tone="info">{tenant.plan} plan</StatusBadge>}
         />
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">

@@ -8,7 +8,7 @@ export default function IntegrationsPage({ params }: { params: { projectId: stri
   if (!project) return notFound();
 
   return (
-    <AppShell>
+    <AppShell project={project}>
       <div className="space-y-6">
         <SectionHeader eyebrow="Integrations hub" title={`${project.name} toolchain and API registry`} description="Show connected source systems and all externally governed APIs or services." />
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">

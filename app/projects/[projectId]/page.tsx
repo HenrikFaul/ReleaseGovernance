@@ -10,11 +10,13 @@ export default function ProjectDashboardPage({ params }: { params: { projectId: 
   if (!project) return notFound();
 
   const openAlerts = project.parityAlerts.filter((alert) => alert.state !== "resolved");
-  const latestRelease = project.releases[0];
+  const releasedReleases = project.releases.filter((release) => release.stage !== "unreleased");
+  const unreleasedReleases = project.releases.filter((release) => release.stage === "unreleased");
+  const latestRelease = releasedReleases[0];
   const impact = latestRelease ? evaluateReleaseImpact(latestRelease) : null;
 
   return (
-    <AppShell>
+    <AppShell project={project}>
       <div className="space-y-6">
         <SectionHeader
           eyebrow="Project dashboard"
@@ -23,9 +25,10 @@ export default function ProjectDashboardPage({ params }: { params: { projectId: 
           actions={<StatusBadge tone={project.deploymentStatus === "healthy" ? "success" : project.deploymentStatus === "warning" ? "warning" : "danger"}>{project.deploymentStatus}</StatusBadge>}
         />
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <StatCard label="Tracked releases" value={String(project.releases.length)} helper="Web, mobile, backend and shared-contract versions" />
-          <StatCard label="Capabilities" value={String(project.capabilities.length)} helper="Tracked independently from commits" />
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+          <StatCard label="Released versions" value={String(releasedReleases.length)} helper="Tracked shipped releases" />
+          <StatCard label="Unreleased tracks" value={String(unreleasedReleases.length)} helper="Planned but not yet deployed" />
+          <StatCard label="Capabilities" value={String(project.capabilities.length)} helper="Imported from inventories and Jira" />
           <StatCard label="Open parity alerts" value={String(openAlerts.length)} helper="Cross-surface follow-up required" />
           <StatCard label="Connected integrations" value={String(project.integrations.length)} helper="Source systems and external APIs" />
         </div>
@@ -33,7 +36,7 @@ export default function ProjectDashboardPage({ params }: { params: { projectId: 
         <div className="grid gap-6 xl:grid-cols-[1.1fr,0.9fr]">
           <section className="card p-6">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-slate-900">Latest release posture</h3>
+              <h3 className="text-lg font-semibold text-slate-900">Latest released posture</h3>
               {latestRelease ? <StatusBadge tone={impact?.complianceStatus === "ready" ? "success" : impact?.complianceStatus === "needs-follow-up" ? "warning" : "danger"}>{impact?.complianceStatus}</StatusBadge> : null}
             </div>
             {latestRelease ? (
@@ -60,7 +63,7 @@ export default function ProjectDashboardPage({ params }: { params: { projectId: 
                 </Link>
               </div>
             ) : (
-              <div className="mt-4 text-sm text-slate-500">No release records yet.</div>
+              <div className="mt-4 text-sm text-slate-500">No released versions yet.</div>
             )}
           </section>
 

@@ -8,7 +8,7 @@ export default function TraceabilityPage({ params }: { params: { projectId: stri
   if (!project) return notFound();
 
   return (
-    <AppShell>
+    <AppShell project={project}>
       <div className="space-y-6">
         <SectionHeader eyebrow="Traceability" title={`${project.name} Jira and parity mapping`} description="Follow requirements from Jira through releases and see what still needs backfill or cross-surface follow-up." />
         <div className="grid gap-6 xl:grid-cols-[1fr,1fr]">
@@ -17,9 +17,12 @@ export default function TraceabilityPage({ params }: { params: { projectId: stri
             <div className="mt-4 space-y-4">
               {project.releases.map((release) => (
                 <div key={release.id} className="rounded-2xl border border-slate-200 p-4">
-                  <div className="font-medium text-slate-900">{release.version}</div>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="font-medium text-slate-900">{release.version}</div>
+                    <StatusBadge tone={release.stage === "unreleased" ? "info" : "success"}>{release.stage === "unreleased" ? "unreleased" : "released"}</StatusBadge>
+                  </div>
                   <div className="mt-2 flex flex-wrap gap-2">
-                    {release.jiraLinks.map((jira) => <span key={jira.key} className="badge badge-neutral">{jira.key}</span>)}
+                    {release.jiraLinks.map((jira) => <span key={jira.key + jira.summary} className="badge badge-neutral">{jira.key}</span>)}
                   </div>
                   {release.jiraBackfillRequired ? <div className="mt-2 text-sm text-rose-600">Jira backfill required before release-ready.</div> : null}
                 </div>
