@@ -1,0 +1,27 @@
+- id: release_center
+  name: Release Center
+  surfaces:
+    web: shipped
+    mobile-android: planned
+    mobile-ios: planned
+    backend: partial
+    shared-contract: partial
+  jira_keys: [RLG-7, RLG-8]
+  parity_status: aligned
+
+- id: capability_registry
+  name: Capability Registry
+  surfaces:
+    web: shipped
+    backend: partial
+  jira_keys: [RLG-7]
+  parity_status: aligned
+
+- id: impact_engine
+  name: Impact Engine
+  surfaces:
+    web: shipped
+    backend: planned
+    shared-contract: partial
+  jira_keys: [RLG-9]
+  parity_status: follow-up-required

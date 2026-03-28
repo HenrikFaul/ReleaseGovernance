@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://releasegovernance.dev/schemas/release-impact.schema.json",
+  "title": "ReleaseGovernance release impact file",
+  "type": "object",
+  "required": [
+    "change_id",
+    "surface",
+    "jira_keys",
+    "backend_changed",
+    "shared_contract_changed",
+    "schema_changed",
+    "integrations_changed",
+    "parity",
+    "capabilities_changed",
+    "release_notes"
+  ],
+  "properties": {
+    "change_id": { "type": "string" },
+    "surface": {
+      "type": "array",
+      "items": {
+        "enum": ["web", "mobile-android", "mobile-ios", "backend", "shared-contract"]
+      },
+      "minItems": 1
+    },
+    "jira_keys": { "type": "array", "items": { "type": "string" } },
+    "jira_backfill_required": { "type": "boolean", "default": false },
+    "backend_changed": { "type": "boolean" },
+    "shared_contract_changed": { "type": "boolean" },
+    "schema_changed": { "type": "boolean" },
+    "migration_files": { "type": "array", "items": { "type": "string" } },
+    "integrations_changed": { "type": "array", "items": { "type": "string" } },
+    "lovable_affected": { "type": "boolean", "default": false },
+    "parity": {
+      "type": "object",
+      "required": ["affects_other_surfaces", "required_updates"],
+      "properties": {
+        "affects_other_surfaces": { "type": "boolean" },
+        "required_updates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["surface", "reason"],
+            "properties": {
+              "surface": { "enum": ["web", "mobile-android", "mobile-ios", "backend", "shared-contract"] },
+              "reason": { "type": "string" },
+              "jira_key": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "capabilities_changed": { "type": "array", "items": { "type": "string" } },
+    "release_notes": { "type": "string" }
+  }
+}
