@@ -1,47 +1,19 @@
-# ReleaseGovernance
+# Hobbeast governance validation pack
 
-ReleaseGovernance is a multi-tenant B2B governance web application for teams shipping software across web, Android, iPhone and shared backend surfaces.
+Ez a csomag a Hobbeasthez ugyanazt a governance-rendezést adja meg, amit korábban a Sync projektnél használtunk, de most **a feltöltött Hobbeast repo + Jira CSV + 3 Hobbeast inventory md** alapján validálva.
 
-## What this MVP contains
+## Fájlok
+- `hobbeast-validation-notes.md` – mi változott az eredeti md-khez képest
+- `hobbeast_feature_inventory.validated.md` – rövidebb, vezetői feature inventory
+- `hobbeast_feature_inventory_detailed.validated.md` – részletesebb, validált feature mátrix
+- `hobbeast_connection_and_release_inventory.validated.md` – integrációs / release / drift inventory
+- `hobbeast-governance-baseline.md` – ReleaseGovernance seed/baseline összefoglaló
+- `hobbeast-governance-import.json` – import-ready strukturált Hobbeast governance adat
+- `CHANGELOG.md` – appendelt Hobbeast changelog blokk
+- `codingLessonsLearnt.md` – appendelt Hobbeast tanulságok
 
-- authentication shell and workspace/project selector
-- project dashboard with release center, parity alerts and integration summary
-- release detail view with Jira traceability and delivered capabilities
-- capability registry
-- integration registry
-- traceability and parity follow-up view
-- automation starter kit view
-- governance SQL schema
-- release-impact and registry starter files
-- GitHub validation workflow starter
-
-## Product model
-
-This app is not Hobbeast-specific. Hobbeast is seeded as the first project example under a generic tenant/workspace model.
-
-## Local run
-
-```bash
-npm install
-npm run dev
-```
-
-## Deployment
-
-Recommended target: Vercel.
-
-Suggested production domain: `releasegovernance.dev`
-
-## Source-of-truth model
-
-- Jira = requirement and work traceability
-- GitHub = code, releases and pull requests
-- Supabase migrations = backend truth
-- ReleaseGovernance = cross-tool impact and parity truth
-
-## Next build steps
-
-- replace mock data with Supabase-backed project data
-- wire real GitHub, Jira, Vercel and Supabase ingestion jobs
-- add RBAC and audit log
-- add release creation and approval workflow
+## Rövid eredmény
+- A feltöltött Hobbeast md-kben szereplő jelenlegi `HOB-*` kulcsok **mind validak** a CSV szerint.
+- A jelenlegi md-kből hiányzott több, a repo által már ténylegesen bizonyított story-szintű Jira kulcs.
+- A validált csomag ezeket **hozzáadja**, és közben **nem állít késznek** olyan részeket, amelyeket a mostani feltöltött repo nem támaszt alá.
+- A jelenlegi legbiztonságosabb Hobbeast release státusz a ReleaseGovernance-ben: **warning**.

@@ -1,13 +1,181 @@
-### [015] Non-exported local seed symbol used as API/page dependency
-- **Tünet / log:** `Module '"@/lib/mock-data"' declares 'tenants' locally, but it is not exported.` build hiba az `app/api/projects/route.ts` és `app/projects/page.tsx` fájlokban.
-- **Kiváltó ok:** a fogyasztó oldalak közvetlenül a `tenants` lokális seedváltozót importálták, miközben a seed refaktor után az már nem volt megbízható publikus felületként használható.
-- **Javítás:** a közvetlen `tenants` import helyett stabil gettert kell használni (`getTenant("tenant_releasegovernance")`), és az API shape-et ott kell visszaépíteni.
-- **Megelőzés:** seed/mock-data fájlban ne importálj közvetlenül lokális tömböket több helyről, ha már létezik getter/helper. A publikus adat-hozzáféréshez csak explicit exportált függvényt vagy konstans API-t használj.
-- **Ellenőrzés:** keresd a repo-ban a `import { tenants } from "@/lib/mock-data"` mintát; build előtt minden ilyen hivatkozást ki kell váltani stabil publikus getterrel.
+# codingLessonsLearnt
 
-### [016] Build fix és capability/data cleanup keverése regresszióveszéllyel
-- **Tünet / log:** egy buildhibás körben könnyű lenne a `mock-data.ts` nagy adatrétegéhez is hozzányúlni, ami újabb seed-, Jira- vagy capability-regressziót okozhat.
-- **Kiváltó ok:** nincs elválasztva a tisztán technikai build blocker javítás a domain-adattisztítási változtatástól.
-- **Javítás:** buildfix körben csak a buildblokkoló import/typing/runtime törést javítsd; capability/Jira seed tisztítást külön patchben kezeld.
-- **Megelőzés:** minden patch elején döntsd el: `build fix`, `data cleanup`, `UI fix`, `feature work`. Ne keverd őket ugyanabba a minimális javítócsomagba, ha nem muszáj.
-- **Ellenőrzés:** a patch scope-ja legyen egy mondatban megfogalmazható; ha több független probléma keveredik, bontsd külön patch-ekre.
+## Kötelező fejlesztési rutin
+
+Minden új fejlesztési, javítási vagy refaktorálási kör **elején** ezt a fájlt kell először átnézni.
+
+Kötelező szabályok:
+1. Mielőtt bármilyen kódmódosítást készítesz, olvasd végig ezt a fájlt.
+2. Mielőtt új patch-et adsz át, ellenőrizd, hogy a mostani változtatás nem hozza-e vissza valamelyik korábbi hibát.
+3. Új hibatípus esetén **nem új fájlt** kell létrehozni, hanem ezt a fájlt kell bővíteni.
+4. A fájl tartalmát **nem szabad felülírni vagy lenullázni**; csak appendelni szabad az új tanulságokat.
+5. Minden hibához hozzá kell írni:
+   - a hiba rövid neve
+   - tünet / pontos hibaüzenet
+   - kiváltó ok
+   - javítás módja
+   - megelőzési szabály
+   - ellenőrzési lépés
+6. Nagy seed/mock-data módosítások előtt mindig külön szintaktikai ellenőrzést kell végezni, különösen hosszú stringeknél és nagy kézi másolásoknál.
+7. TypeScript típusmódosítás után minden importáló fájlt össze kell vetni a típusdefiníciókkal.
+8. Ha egy UI-shell vagy shared komponens prop felülete változik, minden hívóhelyet vagy a shell típusát is hozzá kell igazítani.
+9. Adatimport vagy seed-generálás esetén validálni kell az outputot build-kompatibilitás és domain-konzisztencia szempontból is.
+
+## Ajánlott bejegyzésstruktúra
+
+Minden új hiba a következő struktúrában kerüljön be:
+
+### [Sorszám] Hiba neve
+- **Tünet / log:**
+- **Kiváltó ok:**
+- **Javítás:**
+- **Megelőzés:**
+- **Ellenőrzés:**
+
+---
+
+## Meglévő tanulságok
+
+### [001] Next.js typedRoutes típushiba a Link href mezőn
+- **Tünet / log:** `Type 'string' is not assignable to type 'UrlObject | RouteImpl<string>'` a `components/app-shell.tsx` fájlban.
+- **Kiváltó ok:** a `typedRoutes` kísérleti Next.js beállítás aktív volt, miközben a navigáció dinamikus string útvonalakat adott át a `Link` komponensnek.
+- **Javítás:** a `typedRoutes` eltávolítása / kikapcsolása a `next.config.mjs`-ben.
+- **Megelőzés:** ha typed routes aktív, akkor minden `href`-et route-kompatibilis típussal kell kezelni; ha a projekt sok dinamikus stringes útvonalat használ, ne legyen bekapcsolva.
+- **Ellenőrzés:** `npm run build` és külön ellenőrzés a `Link href` használatokra.
+
+### [002] Hiányzó TypeScript exportok az import funkcióban
+- **Tünet / log:** `Module '@/lib/types' has no exported member 'ProjectImportBundle'`.
+- **Kiváltó ok:** az import funkció már használta a `ProjectImportBundle`, `ImportedJiraIssue`, `ProjectOverride` és kapcsolódó mezőket, de a `lib/types.ts` nem tartalmazta ezeket.
+- **Javítás:** a hiányzó típusok exportálása a `lib/types.ts`-ből, valamint a kapcsolódó mezők (`releaseState`, `importedJiraIssues`, `description`, `url`) felvétele.
+- **Megelőzés:** új feature rétegnél először a központi típusfájlt kell frissíteni, csak utána a komponenseket.
+- **Ellenőrzés:** `tsc` / `next build`, valamint az importáló fájlok célzott átnézése.
+
+### [003] Hiányzó dependency az import funkcióhoz
+- **Tünet / log:** build vagy runtime hiba az `xlsx` használatakor.
+- **Kiváltó ok:** az Excel import/logika bekerült, de a `package.json` nem tartalmazta az `xlsx` csomagot.
+- **Javítás:** `xlsx` dependency felvétele a `package.json`-ba.
+- **Megelőzés:** minden új külső importot ellenőrizni kell, hogy szerepel-e a dependency listában.
+- **Ellenőrzés:** `npm install`, majd `npm run build`.
+
+### [004] AppShell prop felület és hívóhelyek szétcsúszása
+- **Tünet / log:** `Property 'projectName' does not exist on type ...` az `automation/page.tsx` oldalon.
+- **Kiváltó ok:** a page komponens átadta a `projectName` propot, de az `AppShell` típusa ezt nem fogadta.
+- **Javítás:** az `AppShell` opcionálisan felvette a `projectName` propot.
+- **Megelőzés:** shared layout komponens propfelületének változásakor minden hívóhelyet vagy a layout típusát együtt kell frissíteni.
+- **Ellenőrzés:** keresés a repo-ban az adott komponens összes használatára.
+
+### [005] Import menü regresszió a sidebarban
+- **Tünet / log:** eltűnt az `Import` menüpont, így nem volt elérhető az MD / CSV / XLSX template letöltés és import.
+- **Kiváltó ok:** egy későbbi patch egy régebbi `app-shell` verziót írt vissza, amelyből hiányzott az import navigation item.
+- **Javítás:** az `Import` menüpont visszahelyezése a projekt-specifikus navigation listába.
+- **Megelőzés:** shared shell módosításakor mindig hasonlítsd össze a menü teljes feature-listáját az aktuális elvárt funkciókkal.
+- **Ellenőrzés:** vizuális ellenőrzés projekt kiválasztás után, plusz sidebar snapshot összevetés.
+
+### [006] Projektválasztó nézetben hibásan látható projekt-almenük
+- **Tünet / log:** Dashboard / Releases / Capabilities / Integrations / Traceability / Automation menük már a projektválasztó képernyőn is látszódtak.
+- **Kiváltó ok:** a navigation logika nem különítette el a projekt nélküli és projekt-specifikus állapotot.
+- **Javítás:** ha nincs kiválasztott `projectId`, csak a `Projects` menüpont maradjon.
+- **Megelőzés:** a shellben legyen explicit üres-state navigáció projekt nélküli állapotra.
+- **Ellenőrzés:** `/projects` oldalon ne legyenek projekt-specifikus menük.
+
+### [007] Hamis / invalid Jira key-ek bekerülése seed adatokba
+- **Tünet / log:** olyan Jira kulcsok jelentek meg (pl. `SYN-600`, `SYN-711`, `SYN-730`), amelyek nem léteztek a valós Jira exportban.
+- **Kiváltó ok:** a markdown inventorykben szereplő hivatkozások egy részét validálatlanul emeltük át seedbe, és néhány kulcs csak logikai klaszterként vagy backlog-származék jelölésként szerepelt.
+- **Javítás:** a markdownból jövő kulcsokat a `jiraissues.csv` ellen kell validálni, és csak a ténylegesen létező issue-k maradhatnak Jira linkként.
+- **Megelőzés:** soha ne kerüljön seedbe validálatlan Jira key.
+- **Ellenőrzés:** a seedben szereplő összes `SYN-*` vagy más kulcs legyen összevetve a CSV exporttal.
+
+### [008] Jira validálás utáni túl-agresszív levágás
+- **Tünet / log:** a seedben túl kevés Jira issue maradt, pedig a feltöltött `jiraissues.csv` sokkal több valid jegyet tartalmazott.
+- **Kiváltó ok:** csak a markdownokban explicit említett kulcsokat validáltuk, de a CSV-ben lévő további valid issue-kat nem emeltük vissza capability / unreleased csoportokba.
+- **Javítás:** a valid CSV issue-kat teljes körűen be kell emelni, és üzleti-logikai capability csoportokba kell rendezni, még akkor is, ha nem mind szerepel a markdownokban.
+- **Megelőzés:** forrásprioritás: 1) valid Jira CSV, 2) markdown inventory, 3) logikai grouping.
+- **Ellenőrzés:** a valid issue-k száma ne essen vissza indokolatlanul a CSV-hez képest.
+
+### [009] Hatalmas kézi mock-data seedben szintaktikai string hiba
+- **Tünet / log:** `Unterminated string constant`, majd `Expected ',', got 'h2'` a `lib/mock-data.ts` fájlban.
+- **Kiváltó ok:** több soros Jira description nyers szövege JSON/TS stringként került be escape nélkül, ezért a sortörés megszakította a stringet.
+- **Javítás:** a hosszú descriptionöket vagy template stringként kell biztonságosan escape-elni, vagy előbb normalizálni egy soros formára. A mostani javításnál a buildbiztos `mock-data.ts` verzióra kellett visszaállni.
+- **Megelőzés:** nagy mennyiségű seed adatot ne kézzel, nyers több soros idézőjeles stringekkel illessz be. Használj serializer/normalizer lépést.
+- **Ellenőrzés:** `npm run build` kötelező minden nagy `mock-data.ts` módosítás után; emellett regex-es keresés a több soron át nyitva maradt `"description": "` mintákra.
+
+### [010] README / általános projektinfók hiánya a dashboardon
+- **Tünet / log:** a dashboard csak száraz governance számokat mutatott, de nem jelent meg tech stack, hosting, backend és projektleírás.
+- **Kiváltó ok:** a dashboard modellt nem bővítettük `overview` résszel, és a seedből hiányzott a README-szerű általános blokk.
+- **Javítás:** `ProjectOverview` szerkezet és dashboard megjelenítés bevezetése.
+- **Megelőzés:** minden új projekt seednél legyen külön `overview` blokk.
+- **Ellenőrzés:** a projekt dashboard mindig mutasson legalább leírást, tech stacket, hostingot és backend szolgáltatásokat.
+
+### [011] Release oldal nem Vercel-szerű, nehezen áttekinthető lista
+- **Tünet / log:** a release-ek nem soros registryként jelentek meg, hanem kevésbé áttekinthető blokkokban, illetve az unreleased rész nem volt konzisztens.
+- **Kiváltó ok:** a kezdeti scaffold nem deployment-registry szemléletű volt.
+- **Javítás:** a release oldal Vercel-szerű soros listává alakítása státusz, source, issue count, deployment comment és Jira linkage mezőkkel.
+- **Megelőzés:** a release center nézetet deployment-first mintára kell tervezni.
+- **Ellenőrzés:** egy release sorból azonnal látszódjon verzió, státusz, source, deploy idő, Jira linkage.
+
+### [012] Import funkció csak traceability-be tett Jira elemeket, capabilities-be nem
+- **Tünet / log:** a Jira import megtörtént, de a capability nézet nem kapott belőle hasznos csoportosítható elemeket.
+- **Kiváltó ok:** az import réteg csak `importedJiraIssues` szintre írta az adatot.
+- **Javítás:** a Jira importált issue-k capability candidate-ként is megjeleníthetők legyenek a capability nézetben.
+- **Megelőzés:** import feature tervezésekor mindig ellenőrizni kell, hogy az adat mely nézetekben hasznosul.
+- **Ellenőrzés:** import után Traceability és Capabilities oldalon is látszódjon a hatás.
+
+---
+
+## Rövid ellenőrző lista minden átadás előtt
+- [ ] Elolvastam ezt a fájlt a fejlesztési kör elején.
+- [ ] A módosítás nem hozza vissza a korábbi typedRoutes / props / type export hibákat.
+- [ ] A sidebar menü megfelel a projekt nélküli és projekt-specifikus állapotoknak.
+- [ ] Az import funkció megvan és elérhető.
+- [ ] A seed/mock-data fájl szintaktikailag biztonságos.
+- [ ] A Jira key-ek validáltak.
+- [ ] A valid Jira issue-k nem lettek indokolatlanul levágva.
+- [ ] A build lefutott vagy legalább célzottan ellenőriztem a módosított töréspontokat.
+
+### [013] Authoritative Jira source hierarchy rossz kezelése
+- **Tünet / log:** a Syncfolk seedben fals Jira key-ek maradtak bent, majd egy későbbi javításnál túl kevés valid Jira issue maradt meg.
+- **Kiváltó ok:** a markdown inventoryk Jira hivatkozásai részben nem valós kulcsok voltak, miközben a tényleges authoritative forrás a `jiraissues.csv`. Először validálatlanul kerültek be kulcsok, utána pedig túl agresszíven csak a markdownban szereplő valid kulcsok maradtak bent.
+- **Javítás:** forráshierarchia rögzítése: `jiraissues.csv` az authoritative issue source, a markdown inventoryk az authoritative funkcionális értelmezési források. A seedben minden valid CSV issue-nak bent kell maradnia, és a markdown csak a grouping / implemented-vs-planned értelmezést adhatja.
+- **Megelőzés:** Jira key-eket soha ne a markdownból tekints authoritative-nak. Először a valid CSV issue universe-t kell felépíteni, utána arra kell ráilleszteni a markdown business groupinget.
+- **Ellenőrzés:** a seedben szereplő összes Jira key legyen részhalmaza a CSV-nek, és a CSV összes valid issue-ja legyen lefedve imported Jira issue-ként vagy grouping szinten.
+
+### [014] Changelog append-only governance hiánya
+- **Tünet / log:** új fejlesztési körökben nem volt egyértelműen rögzítve, hogy a korábbi leszállított funkciókat nem szabad regresszióval kivenni, és a changeloghoz hozzá kell appendelni minden új változást.
+- **Kiváltó ok:** a changelogot korábban pusztán release note-ként kezeltük, nem pedig fejlesztési governance dokumentumként.
+- **Javítás:** a `CHANGELOG.md` tetejére kötelező “how to use” blokk került, amely előírja az olvasási, appendelési és regresszió-ellenőrzési szabályokat.
+- **Megelőzés:** minden fejlesztési kör elején olvasd el a changelogot is a coding lessons mellett.
+- **Ellenőrzés:** új patch átadása előtt legyen frissítve a changelog Added / Changed / Fixed blokkja, és ne hiányozzon belőle a mostani kör.
+
+### [015] Current repo evidence must override broader historical markdown claims
+- **Tünet / log:** a Hobbeast inventory md-k több olyan területet is „implemented” vagy nagyon előrehaladott állapotúnak mutattak (pl. hidden hubs, fejlettebb analytics), amelyeket a most feltöltött aktuális repo nem támasztott alá közvetlenül.
+- **Kiváltó ok:** a dokumentáció több korábbi workstream-értelmezést és backlog-visszavezetést kevert a jelenlegi feltöltött web repo állapotával.
+- **Javítás:** evidence-tier modell bevezetése:
+  1. Jira CSV = létező issue-univerzum,
+  2. feltöltött repo = jelenlegi kódbizonyíték,
+  3. md inventory = üzleti értelmezési réteg, de nem automatikus runtime-bizonyíték.
+- **Megelőzés:** ha a user kódbázist is ad, akkor minden „implemented” állítást a feltöltött repo alapján újra kell validálni.
+- **Ellenőrzés:** minden current-runtime claimhez legyen konkrét repo-evidence (fájl, migration, edge function, page vagy builderedmény).
+
+### [016] Nem elég, hogy a Jira kulcs valid – a coverage teljességét is ellenőrizni kell
+- **Tünet / log:** a Hobbeast md-kben szereplő Jira kulcsok ugyan validak voltak, de sok jelenlegi repo által már bizonyított story-szintű issue hiányzott belőlük.
+- **Kiváltó ok:** az eredeti inventoryk inkább epic- és nagyblokk-szinten foglalták össze az állapotot, ezért a ténylegesen elkészült story-k egy része nem jelent meg bennük.
+- **Javítás:** a validált pack hozzáadta a hiányzó repo-evidenced story-kat a capability/release értelmezéshez.
+- **Megelőzés:** Jira-validálás után mindig csinálj egy második lépést: repo-evidenced feature family → hiányzó releváns Jira storyk.
+- **Ellenőrzés:** ha egy feature bizonyítottan ott van a repo-ban, akkor legyen legalább az epicje és a fő story-jai bent a governance mappingben.
+
+### [017] Exact-summary duplicate Jira családok kettős számolást okozhatnak
+- **Tünet / log:** a Hobbeast CSV-ben több azonos summary-jú, de külön Jira key-jű issue-család van (pl. `HOB-140/HOB-141`, `HOB-208..211`, `HOB-205/HOB-206`).
+- **Kiváltó ok:** ismételt issue-létrehozás / backfill során több azonos tartalmú jegy is létrejött.
+- **Javítás:** minden valid issue maradjon bent imported Jira traceability-ként, de a capability/release mappinghez egy canonical representative key-t kell választani.
+- **Megelőzés:** CSV import után mindig futtasd le a duplicate-summary ellenőrzést.
+- **Ellenőrzés:** a release és capability számlálók ne duplázzanak csak azért, mert azonos summary több key alatt is létezik.
+
+### [018] A zöld build nem egyenlő a release-igazsággal
+- **Tünet / log:** a Hobbeast feltöltött repo lokálisan lebuildelt, mégsem lenne őszinte automatikusan `healthy` release-állapotot adni neki.
+- **Kiváltó ok:** a build csak a frontend bundle-konzisztenciát ellenőrzi; nem bizonyítja a production deployt, a remote schema teljességét vagy a runtime integrációk tényleges környezeti működését.
+- **Javítás:** a governance seedben külön kezeld:
+  - build health,
+  - schema completeness,
+  - production/release confidence.
+- **Megelőzés:** soha ne azonosítsd a „build passed” állapotot a „shipped and healthy” állapottal.
+- **Ellenőrzés:** ha nincs teljes runtime/prod audit, a deployment státusz maradjon `warning`.
