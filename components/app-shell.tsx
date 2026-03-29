@@ -15,7 +15,15 @@ function navigation(projectId?: string) {
   ];
 }
 
-export function AppShell({ children, projectId }: { children: ReactNode; projectId?: string }) {
+export function AppShell({
+  children,
+  projectId,
+  projectName: _projectName,
+}: {
+  children: ReactNode;
+  projectId?: string;
+  projectName?: string;
+}) {
   const items = navigation(projectId);
   return (
     <div className="min-h-screen bg-slate-50">
