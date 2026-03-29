@@ -1,8 +1,14 @@
-## [Unreleased] - 2026-03-29 22:20 UTC
+# CHANGELOG
+
+Read this whole file before starting work. Do not remove previously delivered functionality from the codebase. New changes must always be appended with timestamp and context. Never replace the file contents with only the newest change.
+
+## [Unreleased] - 2026-03-29 23:10 UTC
 
 ### Fixed
-- Hardened Jira backfill CSV export in the Automation screen so `labels` can be read safely whether the current data shape provides an array or a plain string.
-- Removed a build blocker caused by calling `.join(" ")` on a value that was not always an array.
+- Reintroduced the Jira backfill feature in a compile-safe way by adding a canonical `lib/backfill.ts` helper and wiring Capabilities, Traceability and Automation pages to the same normalized source.
+- Fixed a scoping regression where the Capabilities screen referenced `backfill` without defining it in the page scope.
+- Centralized label normalization so backfill matching, UI badge rendering and CSV export do not drift apart.
 
-### Engineering note
-- Build-fix patches must normalize heterogeneous seed/import data instead of assuming one exact runtime shape.
+### Notes
+- This patch intentionally avoids touching the already working Hobbeast and Syncfolk governance data beyond optional backfill counts.
+- Root-level documentation/export artifacts should be reviewed separately from runtime build fixes.

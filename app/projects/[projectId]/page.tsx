@@ -4,28 +4,17 @@ import { AppShell } from "@/components/app-shell";
 import { SectionHeader, StatCard, StatusBadge } from "@/components/ui";
 import { evaluateReleaseImpact } from "@/lib/impact-engine";
 import { getProject } from "@/lib/mock-data";
-import { summarizeBackfill } from "@/lib/backfill";
 
 export default function ProjectDashboardPage({ params }: { params: { projectId: string } }) {
   const project = getProject(params.projectId);
   if (!project) return notFound();
 
-  const deployedReleases = project.releases.filter((release) => (release.releaseState ?? "released") === "released");
-  const unreleasedReleases = project.releases.filter((release) => release.releaseState === "unreleased");
+  const deployedReleases = project.releases.filter((release) => release.status !== "unreleased");
+  const unreleasedReleases = project.releases.filter((release) => release.status === "unreleased");
   const openAlerts = project.parityAlerts.filter((alert) => alert.state !== "resolved");
-  const currentRelease =
-    project.releases.find((release) => release.status === "current")
-    ?? deployedReleases[0]
-    ?? project.releases[0];
-
+  const currentRelease = project.releases.find((release) => release.status === "current") ?? deployedReleases[0];
   const impact = currentRelease ? evaluateReleaseImpact(currentRelease) : null;
-  const releasedCapabilities = project.capabilities.filter((capability) =>
-    Object.values(capability.firstRelease ?? {}).some((value) =>
-      deployedReleases.some((release) => release.version === value)
-    )
-  );
-  const backfill = summarizeBackfill(project);
-  const backfillCount = backfill.unresolved.length;
+  const backfillCount = project.backfillCandidates?.length ?? 0;
 
   return (
     <AppShell projectId={project.id} projectName={project.name}>
@@ -34,58 +23,16 @@ export default function ProjectDashboardPage({ params }: { params: { projectId: 
           eyebrow="Project dashboard"
           title={project.name}
           description="Unified governance view across product surfaces, shared backend, integrations and delivery documentation."
-          actions={
-            <StatusBadge tone={project.deploymentStatus === "healthy" ? "success" : project.deploymentStatus === "warning" ? "warning" : "danger"}>
-              {project.deploymentStatus}
-            </StatusBadge>
-          }
+          actions={<StatusBadge tone={project.deploymentStatus === "healthy" ? "success" : project.deploymentStatus === "warning" ? "warning" : "danger"}>{project.deploymentStatus}</StatusBadge>}
         />
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
           <StatCard label="Tracked releases" value={String(deployedReleases.length)} helper="Deployed release rows" />
           <StatCard label="Unreleased groups" value={String(unreleasedReleases.length)} helper="Specified but not yet deployed" />
-          <StatCard label="Released features" value={String(releasedCapabilities.length)} helper="Mapped to delivered releases" />
-          <StatCard label="Backfill candidates" value={String(backfillCount)} helper="Deployed without Jira" />
+          <StatCard label="Capabilities" value={String(project.capabilities.length)} helper="Tracked independently from commits" />
           <StatCard label="Open parity alerts" value={String(openAlerts.length)} helper="Cross-surface follow-up required" />
           <StatCard label="Connected integrations" value={String(project.integrations.length)} helper="Source systems and external APIs" />
-        </div>
-
-        <div className="grid gap-6 xl:grid-cols-[1.1fr,0.9fr]">
-          <section className="card p-6">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-lg font-semibold text-slate-900">Deployed features without Jira tickets</h3>
-                <p className="mt-2 text-sm text-slate-600">These are already-detected shipped features that still need Jira creation and CSV export. Once their unique backfill labels appear on imported Jira issues, they move out of this queue and into normal unreleased Jira tracking.</p>
-              </div>
-              <Link href={`/projects/${project.id}/automation`} className="inline-flex rounded-2xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
-                Open export
-              </Link>
-            </div>
-            <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              <div className="rounded-2xl bg-slate-50 p-4">
-                <div className="text-sm text-slate-500">Needs Jira backfill</div>
-                <div className="mt-2 text-2xl font-semibold text-slate-900">{backfill.unresolved.length}</div>
-              </div>
-              <div className="rounded-2xl bg-slate-50 p-4">
-                <div className="text-sm text-slate-500">Already linked back to Jira</div>
-                <div className="mt-2 text-2xl font-semibold text-slate-900">{backfill.resolved.length}</div>
-              </div>
-              <div className="rounded-2xl bg-slate-50 p-4">
-                <div className="text-sm text-slate-500">CSV rows ready</div>
-                <div className="mt-2 text-2xl font-semibold text-slate-900">{backfill.csvRows.length}</div>
-              </div>
-            </div>
-          </section>
-
-          <section className="card p-6">
-            <h3 className="text-lg font-semibold text-slate-900">Backfill lifecycle</h3>
-            <ol className="mt-4 space-y-3 text-sm text-slate-600">
-              <li>1. Export unresolved backfill rows from the Automation page as Jira-importable CSV.</li>
-              <li>2. Import them into Jira with the generated unique tracking label preserved.</li>
-              <li>3. Re-import Jira items into this project.</li>
-              <li>4. ReleaseGovernance will detect the matching label and treat the feature as Jira-backed work instead of a Jira-less deployed exception.</li>
-            </ol>
-          </section>
+          <StatCard label="Backfill candidates" value={String(backfillCount)} helper="Deployed without Jira" />
         </div>
 
         <div className="grid gap-6 xl:grid-cols-[1.15fr,0.85fr]">
@@ -94,7 +41,7 @@ export default function ProjectDashboardPage({ params }: { params: { projectId: 
               <h3 className="text-lg font-semibold text-slate-900">Current release posture</h3>
               {currentRelease ? (
                 <StatusBadge tone={impact?.complianceStatus === "ready" ? "success" : impact?.complianceStatus === "needs-follow-up" ? "warning" : "danger"}>
-                  {currentRelease.status ?? currentRelease.releaseState ?? "old"}
+                  {currentRelease.status ?? "old"}
                 </StatusBadge>
               ) : null}
             </div>
@@ -105,7 +52,7 @@ export default function ProjectDashboardPage({ params }: { params: { projectId: 
                   <div className="mt-1 text-slate-500">{currentRelease.releaseNotes}</div>
                 </div>
                 <ul className="space-y-2">
-                  <li>Status: {currentRelease.status ?? currentRelease.releaseState ?? "old"}</li>
+                  <li>Status: {currentRelease.status ?? "old"}</li>
                   <li>Surfaces: {currentRelease.surfaces.join(", ")}</li>
                   <li>Backend changed: {String(currentRelease.backendChanged)}</li>
                   <li>Shared contract changed: {String(currentRelease.sharedContractChanged)}</li>

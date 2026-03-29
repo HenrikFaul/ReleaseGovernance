@@ -2,30 +2,19 @@ import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { SectionHeader } from "@/components/ui";
 import { getProject } from "@/lib/mock-data";
+import { summarizeBackfill } from "@/lib/backfill";
 
 function escapeCsv(value: string) {
   const normalized = value.replace(/"/g, '""');
   return `"${normalized}"`;
 }
 
-function normalizeLabels(value: string[] | string | undefined) {
-  if (Array.isArray(value)) return value.join(" ");
-  if (typeof value === "string") return value;
-  return "";
-}
-
 export default function AutomationPage({ params }: { params: { projectId: string } }) {
   const project = getProject(params.projectId);
   if (!project) return notFound();
+  const backfill = summarizeBackfill(project);
 
-  const rows = (project.backfillCandidates ?? []).map((candidate) => ({
-    issueType: candidate.issueType,
-    summary: candidate.summary,
-    description: candidate.description,
-    parent: candidate.parent,
-    labels: normalizeLabels(candidate.labels)
-  }));
-
+  const rows = backfill.csvRows;
   const csvHeader = ["Issue Type", "Summary", "Description", "Parent", "Labels"];
   const csvBody = rows.map((row) => [
     escapeCsv(row.issueType),
@@ -72,6 +61,12 @@ export default function AutomationPage({ params }: { params: { projectId: string
             <a href={downloadHref} download={`${project.slug}-jira-backfill.csv`} className="inline-flex rounded-2xl bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700">
               Download CSV
             </a>
+          </div>
+
+          <div className="mt-6 grid gap-4 md:grid-cols-3">
+            <div className="rounded-2xl bg-slate-50 p-4 text-sm"><div className="text-slate-500">Unresolved candidates</div><div className="mt-1 text-xl font-semibold text-slate-900">{backfill.unresolved.length}</div></div>
+            <div className="rounded-2xl bg-slate-50 p-4 text-sm"><div className="text-slate-500">Already linked to Jira</div><div className="mt-1 text-xl font-semibold text-slate-900">{backfill.resolved.length}</div></div>
+            <div className="rounded-2xl bg-slate-50 p-4 text-sm"><div className="text-slate-500">CSV rows</div><div className="mt-1 text-xl font-semibold text-slate-900">{rows.length}</div></div>
           </div>
 
           <div className="mt-6 overflow-x-auto">

@@ -5,8 +5,14 @@ export interface ResolvedBackfillCandidate {
   matchingIssues: ImportedJiraIssue[];
 }
 
-function normalize(values: string[] | undefined) {
-  return new Set((values ?? []).map((value) => value.trim().toLowerCase()).filter(Boolean));
+export function normalizeBackfillLabels(values: string[] | string | undefined) {
+  if (Array.isArray(values)) return values.filter(Boolean);
+  if (typeof values === "string" && values.trim()) return values.split(/\s+/).filter(Boolean);
+  return [];
+}
+
+function normalize(values: string[] | string | undefined) {
+  return new Set(normalizeBackfillLabels(values).map((value) => value.trim().toLowerCase()).filter(Boolean));
 }
 
 export function findMatchingJiraIssues(candidate: BackfillCandidate, issues: ImportedJiraIssue[]) {
@@ -44,7 +50,7 @@ export function summarizeBackfill(project: ProjectRecord) {
       summary: candidate.summary,
       description: candidate.description,
       parent: candidate.parent,
-      labels: candidate.labels.join(" "),
+      labels: normalizeBackfillLabels(candidate.labels).join(" "),
     })),
   };
 }

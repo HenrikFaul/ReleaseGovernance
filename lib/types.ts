@@ -104,7 +104,7 @@ export interface BackfillCandidate {
   summary: string;
   description: string;
   parent: string;
-  labels: string[];
+  labels: string[] | string;
   issueType: "Story" | "Task";
   recommendedRelease?: string;
 }

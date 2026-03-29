@@ -3,11 +3,10 @@
 import { AppShell } from "@/components/app-shell";
 import { SectionHeader, StatusBadge } from "@/components/ui";
 import { useProjectRecord } from "@/hooks/useProjectRecord";
-import { summarizeBackfill } from "@/lib/backfill";
+import { normalizeBackfillLabels, summarizeBackfill } from "@/lib/backfill";
 
 function sectionedCapabilities(project: NonNullable<ReturnType<typeof useProjectRecord>["project"]>) {
   const releaseByVersion = new Map(project.releases.map((release) => [release.version, release]));
-  const backfill = summarizeBackfill(project);
   const released = project.capabilities.filter((capability) =>
     Object.values(capability.firstRelease ?? {}).some((version) => {
       const release = releaseByVersion.get(version);
@@ -66,7 +65,7 @@ export default function CapabilitiesPage({ params }: { params: { projectId: stri
   if (!project) return <AppShell projectId={params.projectId}><div className="card p-6">Project not found.</div></AppShell>;
 
   const { released, unreleased } = sectionedCapabilities(project);
-  const backfillCandidates = project.backfillCandidates ?? [];
+  const backfill = summarizeBackfill(project);
 
   return (
     <AppShell projectId={project.id}>
@@ -108,7 +107,7 @@ export default function CapabilitiesPage({ params }: { params: { projectId: stri
                   <h3 className="text-lg font-semibold text-slate-900">{candidate.featureName}</h3>
                   <p className="mt-2 text-sm text-slate-600">{candidate.description}</p>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    {candidate.labels.map((label) => <span key={label} className="badge badge-neutral">{label}</span>)}
+                    {normalizeBackfillLabels(candidate.labels).map((label) => <span key={label} className="badge badge-neutral">{label}</span>)}
                   </div>
                 </div>
                 <StatusBadge tone="warning">needs Jira backfill</StatusBadge>
@@ -145,7 +144,7 @@ export default function CapabilitiesPage({ params }: { params: { projectId: stri
                   <h3 className="text-lg font-semibold text-slate-900">{candidate.featureName}</h3>
                   <p className="mt-2 text-sm text-slate-600">{candidate.description}</p>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    {candidate.labels.map((label) => <span key={label} className="badge badge-neutral">{label}</span>)}
+                    {normalizeBackfillLabels(candidate.labels).map((label) => <span key={label} className="badge badge-neutral">{label}</span>)}
                   </div>
                 </div>
                 <StatusBadge tone="success">Jira story detected</StatusBadge>
