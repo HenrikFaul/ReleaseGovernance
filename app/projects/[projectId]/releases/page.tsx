@@ -1,57 +1,103 @@
-"use client";
-
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { SectionHeader, StatusBadge, SurfaceBadge } from "@/components/ui";
-import { evaluateReleaseImpact } from "@/lib/impact-engine";
-import { useProjectRecord } from "@/hooks/useProjectRecord";
+import { getProject } from "@/lib/mock-data";
+
+function formatSourceLabel(
+  source?: { kind?: string; owner?: string; repository?: string; label?: string }
+) {
+  if (!source) return "Unknown source";
+  if (source.label) return source.label;
+  if (source.kind === "github" && source.owner && source.repository) return `GitHub / ${source.owner}/${source.repository}`;
+  if (source.owner && source.repository) return `${source.kind} / ${source.owner}/${source.repository}`;
+  return source.kind ?? "Unknown source";
+}
 
 export default function ReleasesPage({ params }: { params: { projectId: string } }) {
-  const { project } = useProjectRecord(params.projectId);
-  if (!project) return <AppShell projectId={params.projectId}><div className="card p-6">Project not found.</div></AppShell>;
+  const project = getProject(params.projectId);
+  if (!project) return notFound();
 
-  const released = project.releases.filter((item) => (item.releaseState ?? "released") === "released");
-  const unreleased = project.releases.filter((item) => item.releaseState === "unreleased");
+  const deployed = project.releases.filter((release) => release.status !== "unreleased");
+  const unreleased = project.releases.filter((release) => release.status === "unreleased");
 
-  const renderRelease = (release: typeof project.releases[number]) => {
-    const impact = evaluateReleaseImpact(release);
+  const renderRow = (releaseId: string) => {
+    const release = project.releases.find((item) => item.id === releaseId);
+    if (!release) return null;
+
+    const tone = release.status === "current" ? "success" : release.status === "unreleased" ? "info" : "neutral";
+
     return (
-      <div key={release.id} className="card p-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      <Link key={release.id} href={`/projects/${project.id}/releases/${release.id}`} className="block rounded-2xl border border-slate-200 bg-white p-4 transition hover:border-slate-300 hover:bg-slate-50">
+        <div className="grid gap-4 xl:grid-cols-[1.2fr,0.95fr,0.65fr,0.85fr,1.2fr,0.55fr,1.2fr,0.7fr]">
           <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className="text-lg font-semibold text-slate-900">{release.version}</h3>
-              <StatusBadge tone={release.releaseState === "unreleased" ? "info" : impact.complianceStatus === "ready" ? "success" : impact.complianceStatus === "needs-follow-up" ? "warning" : "danger"}>
-                {release.releaseState === "unreleased" ? "unreleased" : impact.complianceStatus}
-              </StatusBadge>
+            <div className="text-sm font-semibold text-slate-900">{release.version}</div>
+            <div className="mt-1 flex flex-wrap gap-2">
+              {release.surfaces.map((surface) => <SurfaceBadge key={surface} surface={surface} />)}
             </div>
-            <p className="mt-2 max-w-3xl text-sm text-slate-600">{release.releaseNotes}</p>
-            <div className="mt-3 flex flex-wrap gap-2">{release.surfaces.map((surface) => <SurfaceBadge key={surface} surface={surface} />)}</div>
           </div>
-          <Link href={`/projects/${project.id}/releases/${release.id}`} className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Open detail</Link>
+          <div className="text-sm text-slate-600">
+            <div className="font-medium text-slate-900">Status</div>
+            <div className="mt-1"><StatusBadge tone={tone as any}>{release.status ?? "old"}</StatusBadge></div>
+          </div>
+          <div className="text-sm text-slate-600">
+            <div className="font-medium text-slate-900">Deploy date</div>
+            <div className="mt-1">{release.shippedAt}</div>
+          </div>
+          <div className="text-sm text-slate-600">
+            <div className="font-medium text-slate-900">Source kind</div>
+            <div className="mt-1">{release.source?.kind ?? "unknown"}</div>
+          </div>
+          <div className="text-sm text-slate-600">
+            <div className="font-medium text-slate-900">Source repository</div>
+            <div className="mt-1">{formatSourceLabel(release.source)}</div>
+          </div>
+          <div className="text-sm text-slate-600">
+            <div className="font-medium text-slate-900">Issue count</div>
+            <div className="mt-1">{release.jiraLinks.length}</div>
+          </div>
+          <div className="text-sm text-slate-600">
+            <div className="font-medium text-slate-900">Deployment comment</div>
+            <div className="mt-1">{release.deploymentComment ?? release.releaseNotes}</div>
+          </div>
+          <div className="text-sm text-slate-600">
+            <div className="font-medium text-slate-900">Jira linked</div>
+            <div className="mt-1">{release.jiraLinks.length > 0 ? "Yes" : "No"}</div>
+          </div>
         </div>
-        <div className="mt-5 grid gap-4 text-sm text-slate-600 md:grid-cols-4">
-          <div>Backend changed: <span className="font-medium text-slate-900">{String(release.backendChanged)}</span></div>
-          <div>Shared contract: <span className="font-medium text-slate-900">{String(release.sharedContractChanged)}</span></div>
-          <div>Schema changed: <span className="font-medium text-slate-900">{String(release.schemaChanged)}</span></div>
-          <div>{release.releaseState === "unreleased" ? "Planning state" : "Shipped at"}: <span className="font-medium text-slate-900">{release.shippedAt}</span></div>
-        </div>
-      </div>
+      </Link>
     );
   };
 
   return (
-    <AppShell projectId={project.id}>
+    <AppShell projectId={project.id} projectName={project.name}>
       <div className="space-y-6">
-        <SectionHeader eyebrow="Release center" title={`${project.name} releases`} description="Track what shipped, where, and with which backend or integration implications. Unreleased groups hold governed scope that has not yet been deployed." />
-        <section className="space-y-4">
-          <h3 className="text-lg font-semibold text-slate-900">Released</h3>
-          {released.length ? released.map(renderRelease) : <div className="card p-6 text-sm text-slate-500">No released versions yet.</div>}
+        <SectionHeader eyebrow="Release center" title={`${project.name} releases`} description="Each row represents a governed release record. Open a row to inspect functionality, Jira traceability and cross-platform impact." />
+        <section className="space-y-3">
+          <div className="card p-4">
+            <div className="grid gap-4 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500 xl:grid-cols-[1.2fr,0.95fr,0.65fr,0.85fr,1.2fr,0.55fr,1.2fr,0.7fr]">
+              <div>Release version / surfaces</div>
+              <div>Status</div>
+              <div>Deploy date</div>
+              <div>Source kind</div>
+              <div>Source repository</div>
+              <div>Issue count</div>
+              <div>Deployment comment</div>
+              <div>Jira linked</div>
+            </div>
+          </div>
+          {deployed.map((release) => renderRow(release.id))}
         </section>
-        <section className="space-y-4">
-          <h3 className="text-lg font-semibold text-slate-900">Unreleased</h3>
-          {unreleased.length ? unreleased.map(renderRelease) : <div className="card p-6 text-sm text-slate-500">No unreleased groups tracked.</div>}
-        </section>
+
+        {unreleased.length ? (
+          <section className="space-y-3">
+            <div className="card p-5">
+              <h3 className="text-lg font-semibold text-slate-900">Unreleased</h3>
+              <p className="mt-2 text-sm text-slate-600">Specified and imported items that are not yet deployed. These remain visible under the same release registry.</p>
+            </div>
+            {unreleased.map((release) => renderRow(release.id))}
+          </section>
+        ) : null}
       </div>
     </AppShell>
   );

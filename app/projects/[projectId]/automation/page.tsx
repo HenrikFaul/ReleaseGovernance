@@ -1,15 +1,14 @@
-"use client";
-
+import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { SectionHeader } from "@/components/ui";
-import { useProjectRecord } from "@/hooks/useProjectRecord";
+import { getProject } from "@/lib/mock-data";
 
 export default function AutomationPage({ params }: { params: { projectId: string } }) {
-  const { project } = useProjectRecord(params.projectId);
-  if (!project) return <AppShell projectId={params.projectId}><div className="card p-6">Project not found.</div></AppShell>;
+  const project = getProject(params.projectId);
+  if (!project) return notFound();
 
   return (
-    <AppShell projectId={project.id}>
+    <AppShell projectId={project.id} projectName={project.name}>
       <div className="space-y-6">
         <SectionHeader eyebrow="Automation" title={`${project.name} starter governance kit`} description="Policy files, CI templates and automation rules that make governance enforceable instead of optional." />
         <div className="grid gap-4 md:grid-cols-2">
@@ -30,7 +29,6 @@ export default function AutomationPage({ params }: { params: { projectId: string
               <li>Backend or shared-contract changes must raise parity review signals.</li>
               <li>Integration changes must record env or secret sensitivity.</li>
               <li>Release readiness is blocked when governance metadata is incomplete.</li>
-              <li>Imports should normalize into releases, capabilities, integrations and Jira references.</li>
             </ul>
           </div>
         </div>
