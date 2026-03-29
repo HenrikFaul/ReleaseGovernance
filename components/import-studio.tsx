@@ -31,12 +31,13 @@ export function ImportStudio({ projectId }: { projectId: string }) {
       unreleased: bundle.releases.filter((item) => item.releaseState === "unreleased").length,
       capabilities: bundle.capabilities.length,
       integrations: bundle.integrations.length,
-      jira: bundle.importedJiraIssues.length,
+      jira: bundle.importedJiraIssues.length
     };
   }, [bundle]);
 
   async function onFile(file: File) {
-    setError(""); setStatus("");
+    setError("");
+    setStatus("");
     try {
       const parsed = await parseImportFile(file);
       setBundle(parsed);
@@ -47,12 +48,13 @@ export function ImportStudio({ projectId }: { projectId: string }) {
   }
 
   async function onJiraImport() {
-    setError(""); setStatus("");
+    setError("");
+    setStatus("");
     try {
       const res = await fetch("/api/jira/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jiraUrl, email: jiraEmail, apiToken: jiraToken }),
+        body: JSON.stringify({ jiraUrl, email: jiraEmail, apiToken: jiraToken })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Jira import failed.");
@@ -60,9 +62,9 @@ export function ImportStudio({ projectId }: { projectId: string }) {
         releases: current?.releases ?? [],
         capabilities: current?.capabilities ?? [],
         integrations: current?.integrations ?? [],
-        importedJiraIssues: data.issues ?? [],
+        importedJiraIssues: data.issues ?? []
       }));
-      setStatus(`Imported ${data.issues?.length ?? 0} Jira issue(s).`);
+      setStatus(`Imported ${data.issues?.length ?? 0} Jira issue(s). These will also appear in Capabilities as imported Jira capability candidates.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Jira import failed.");
     }
@@ -93,15 +95,7 @@ export function ImportStudio({ projectId }: { projectId: string }) {
         <div className="mt-4 flex flex-wrap gap-3">
           <label className="cursor-pointer rounded-2xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
             Upload .md / .csv / .xlsx
-            <input
-              type="file"
-              className="hidden"
-              accept=".md,.markdown,.csv,.xlsx,.xls"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) void onFile(file);
-              }}
-            />
+            <input type="file" className="hidden" accept=".md,.markdown,.csv,.xlsx,.xls" onChange={(e) => { const file = e.target.files?.[0]; if (file) void onFile(file); }} />
           </label>
           <button onClick={() => download("releasegovernance-import-template.md", templateMarkdown, "text/markdown")} className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Download MD template</button>
           <button onClick={() => download("releasegovernance-import-template.csv", templateCsv(), "text/csv")} className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Download CSV template</button>
@@ -112,14 +106,14 @@ export function ImportStudio({ projectId }: { projectId: string }) {
       <section className="card p-6">
         <h3 className="text-lg font-semibold text-slate-900">Jira URL import</h3>
         <p className="mt-2 text-sm text-slate-600">
-          Import Jira key, summary, description and labels by giving a Jira issue URL or an issues page URL with JQL. The imported issues are stored under the selected project as clickable references.
+          Import Jira work by giving an issue URL, an issues page URL with JQL, or a Jira project URL such as <code>/jira/software/projects/KEY</code>. Imported Jira items are stored under the selected project and are also surfaced in the Capabilities view.
         </p>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
-          <input value={jiraUrl} onChange={(e) => setJiraUrl(e.target.value)} placeholder="https://example.atlassian.net/browse/APP-101 or issues?jql=..." className="rounded-2xl border border-slate-200 px-4 py-3 text-sm" />
+          <input value={jiraUrl} onChange={(e) => setJiraUrl(e.target.value)} placeholder="https://example.atlassian.net/jira/software/projects/APP or /browse/APP-101 or /issues?jql=..." className="rounded-2xl border border-slate-200 px-4 py-3 text-sm" />
           <input value={jiraEmail} onChange={(e) => setJiraEmail(e.target.value)} placeholder="Jira account email" className="rounded-2xl border border-slate-200 px-4 py-3 text-sm" />
           <input value={jiraToken} type="password" onChange={(e) => setJiraToken(e.target.value)} placeholder="Jira API token" className="rounded-2xl border border-slate-200 px-4 py-3 text-sm md:col-span-2" />
         </div>
-        <button onClick={onJiraImport} className="mt-4 rounded-2xl bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">Import from Jira URL</button>
+        <button onClick={onJiraImport} className="mt-4 rounded-2xl bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">Import from Jira</button>
       </section>
 
       {error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{error}</div> : null}
@@ -137,31 +131,6 @@ export function ImportStudio({ projectId }: { projectId: string }) {
             <div className="rounded-2xl bg-slate-50 p-4 text-sm"><div className="text-slate-500">Capabilities</div><div className="mt-1 text-xl font-semibold text-slate-900">{summary.capabilities}</div></div>
             <div className="rounded-2xl bg-slate-50 p-4 text-sm"><div className="text-slate-500">Integrations</div><div className="mt-1 text-xl font-semibold text-slate-900">{summary.integrations}</div></div>
             <div className="rounded-2xl bg-slate-50 p-4 text-sm"><div className="text-slate-500">Jira items</div><div className="mt-1 text-xl font-semibold text-slate-900">{summary.jira}</div></div>
-          </div>
-          <div className="mt-6 grid gap-6 xl:grid-cols-2">
-            <div>
-              <h4 className="font-medium text-slate-900">Releases</h4>
-              <div className="mt-3 space-y-2">
-                {bundle?.releases.map((release) => (
-                  <div key={release.id} className="rounded-2xl border border-slate-200 p-3 text-sm">
-                    <div className="font-medium text-slate-900">{release.version}</div>
-                    <div className="text-slate-500">{release.releaseState ?? "released"} · {release.surfaces.join(", ")}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div>
-              <h4 className="font-medium text-slate-900">Capabilities</h4>
-              <div className="mt-3 space-y-2">
-                {bundle?.capabilities.slice(0, 12).map((capability) => (
-                  <div key={capability.id} className="rounded-2xl border border-slate-200 p-3 text-sm">
-                    <div className="font-medium text-slate-900">{capability.name}</div>
-                    <div className="text-slate-500">{capability.jiraKeys.join(", ") || "no Jira linked"}</div>
-                  </div>
-                ))}
-                {(bundle?.capabilities.length ?? 0) > 12 ? <div className="text-xs text-slate-500">+{(bundle?.capabilities.length ?? 0) - 12} more capabilities in this bundle.</div> : null}
-              </div>
-            </div>
           </div>
         </section>
       ) : null}

@@ -81,44 +81,60 @@ function buildIntegrationsFromCaps(caps: CapabilityRecord[]): IntegrationRef[] {
 }
 function buildHeuristicReleases(caps: CapabilityRecord[]): ReleaseItem[] {
   const groups = [
-    ["auth_foundation","web-v0.1.0-auth-foundation","released",["auth","email","oauth","password","identity"]],
-    ["guest_invite_join","web-v0.2.0-guest-invite-join","released",["guest","temporary","join","invite consumption","return path"]],
+    ["auth_foundation","web-v0.1.0-auth-foundation","released",["authentication shell","email identity","oauth identity","password recovery"]],
+    ["guest_invite_join","web-v0.2.0-guest-invite-join","released",["temporary identity","invite consumption","temporary return path"]],
     ["event_creation_lifecycle","web-v0.3.0-event-lifecycle","released",["event creation","event lifecycle","event context"]],
-    ["sharing_and_invites","web-v0.4.0-sharing-and-invites","released",["sharing","share"]],
+    ["sharing_and_invites","web-v0.4.0-sharing-and-invites","released",["sharing"]],
     ["calendar_core","web-v0.5.0-calendar-core","released",["calendar rendering","voting interactions"]],
     ["range_and_day_details","web-v0.6.0-range-and-day-details","released",["range interactions","day details"]],
-    ["ranking_and_decision","web-v0.7.0-ranking-and-decision","released",["ranking","decision","pinned"]],
-    ["notifications_center","web-v0.8.0-notifications","released",["notification"]],
+    ["ranking_and_decision","web-v0.7.0-ranking-and-decision","released",["ranking & decision","pin / decision lifecycle"]],
+    ["notifications_center","web-v0.8.0-notifications","released",["notifications"]],
     ["personal_availability","web-v0.9.0-personal-availability","released",["personal availability"]],
-    ["profile_and_security","web-v0.10.0-profile-security","released",["profile","security"]],
-    ["social_graph","web-v0.11.0-social-graph","released",["social graph","friends","favorites"]],
-    ["admin_operations","web-v0.12.0-admin-ops","released",["admin"]],
-    ["enterprise_shell_membership","unreleased-enterprise-shell-membership","unreleased",["enterprise shell","membership","workspace settings"]],
-    ["enterprise_leave_workflows","unreleased-enterprise-leave-workflows","unreleased",["leave","approval","worklist"]],
-    ["enterprise_rules_settings","unreleased-enterprise-rules-settings","unreleased",["rule","capacity","holiday","work pattern","locale","timezone"]],
-    ["enterprise_import_export","unreleased-enterprise-import-export","unreleased",["import","export","spreadsheet","xml","html"]],
-    ["enterprise_reporting","unreleased-enterprise-reporting","unreleased",["reporting","analytics","kpi"]],
-    ["enterprise_api_audit_parity","unreleased-enterprise-api-audit-parity","unreleased",["api","audit","qa","parity","wireframe","notification matrix"]],
+    ["profile_and_security","web-v0.10.0-profile-security","released",["profile & security"]],
+    ["social_graph","web-v0.11.0-social-graph","released",["social graph"]],
+    ["admin_operations","web-v0.12.0-admin-ops","released",["admin / operations"]],
+    ["enterprise_shell_membership","unreleased-enterprise-shell-membership","unreleased",["enterprise shell","membership"]],
+    ["enterprise_leave_workflows","unreleased-enterprise-leave-workflows","unreleased",["request lifecycle","approval"]],
+    ["enterprise_rules_settings","unreleased-enterprise-rules-settings","unreleased",["rules & settings","rules and settings"]],
+    ["enterprise_import_export","unreleased-enterprise-import-export","unreleased",["import / migration","export & apis"]],
+    ["enterprise_reporting","unreleased-enterprise-reporting","unreleased",["reporting"]],
+    ["enterprise_api_audit_parity","unreleased-enterprise-api-audit-parity","unreleased",["notification & audit","api, data model, wireframes and qa"]]
   ] as const;
-  const assigned = new Set<string>(); const releases: ReleaseItem[] = [];
+  const assigned = new Set<string>();
+  const releases: ReleaseItem[] = [];
   for (const [id, version, state, matchers] of groups) {
     const matched = caps.filter((c) => !assigned.has(c.id) && matchers.some((m) => `${c.name} ${c.description ?? ""}`.toLowerCase().includes(m)));
     if (!matched.length) continue;
     matched.forEach((m) => assigned.add(m.id));
-    const surfaces = new Set<Surface>(); const integrations = new Set<string>(); const jmap = new Map<string,JiraLink>();
+    const surfaces = new Set<Surface>();
+    const integrations = new Set<string>();
+    const jmap = new Map<string, JiraLink>();
     matched.forEach((c) => {
-      Object.entries(c.statusBySurface).forEach(([surface, status]) => { if (status && status !== "planned") surfaces.add(surface as Surface); });
+      Object.entries(c.statusBySurface).forEach(([surface, status]) => { if (status && (state === "unreleased" || status !== "planned")) surfaces.add(surface as Surface); });
       c.integrations.forEach((i) => integrations.add(i));
       c.jiraKeys.forEach((k) => jmap.set(k, { key: k, summary: c.name, status: state === "released" ? "Implemented / mixed" : "Planned", url: `https://hobbeast.atlassian.net/browse/${k}` }));
     });
-    if (!surfaces.size) { surfaces.add("web"); if (matched.some((m) => m.integrations.includes("supabase"))) { surfaces.add("backend"); surfaces.add("shared-contract"); } }
+    if (!surfaces.size) {
+      surfaces.add("web");
+      if (matched.some((m) => m.integrations.includes("supabase"))) {
+        surfaces.add("backend");
+        surfaces.add("shared-contract");
+      }
+    }
     releases.push({
-      id, version, releaseState: state as any, surfaces: Array.from(surfaces), shippedAt: state === "released" ? "2026-03-28" : "Not shipped",
+      id,
+      version,
+      releaseState: state as any,
+      surfaces: Array.from(surfaces),
+      shippedAt: state === "released" ? "2026-03-28" : "Not shipped",
       backendChanged: matched.some((m) => m.integrations.includes("supabase")),
       sharedContractChanged: matched.some((m) => m.integrations.includes("supabase")),
       schemaChanged: matched.some((m) => m.integrations.includes("supabase")),
-      integrationsChanged: Array.from(integrations), jiraBackfillRequired: matched.some((m) => m.jiraKeys.length === 0),
-      deliveredCapabilities: matched.map((m) => m.id), releaseNotes: matched.map((m) => m.name).join(", "), jiraLinks: Array.from(jmap.values())
+      integrationsChanged: Array.from(integrations),
+      jiraBackfillRequired: matched.some((m) => m.jiraKeys.length === 0),
+      deliveredCapabilities: matched.map((m) => m.id),
+      releaseNotes: matched.map((m) => m.name).join(", "),
+      jiraLinks: Array.from(jmap.values())
     });
   }
   return releases;
@@ -127,7 +143,7 @@ function bundleFromInventoryRows(rows: FeatureRow[]): ProjectImportBundle {
   const capabilities = rows.map((row) => {
     const integrations = normalizeIntegrations(row.integrations);
     const statusBySurface = inferSurfaces(row.channel, row.status, row.integrations.map((x) => x.toLowerCase()));
-    return { id: slugify(row.sourceId || row.name), name: row.name, description: row.description, statusBySurface, parityStatus: inferParity(statusBySurface), integrations, jiraKeys: row.jiraKeys } satisfies CapabilityRecord;
+    return { id: slugify(row.sourceId || row.name), name: row.name, description: row.description, statusBySurface, parityStatus: inferParity(statusBySurface), integrations, jiraKeys: row.jiraKeys, source: "file-import" } satisfies CapabilityRecord;
   });
   const integrations = buildIntegrationsFromCaps(capabilities);
   const importedJiraIssues = Array.from(new Set(capabilities.flatMap((c) => c.jiraKeys))).map((key) => ({ id: `jira_${key.toLowerCase()}`, key, summary: "Imported from feature inventory", description: "", labels: [], url: `https://hobbeast.atlassian.net/browse/${key}`, source: "file-import" as const }));
@@ -143,8 +159,8 @@ function parseCanonicalRows(rows: Record<string,string>[]): ProjectImportBundle 
   for (const row of rows) {
     const type = String(row.record_type || "").trim().toLowerCase();
     if (type === "release") releases.push({ id: row.record_id || slugify(row.name || "release"), version: row.name || row.record_id || "release", releaseState: row.state === "unreleased" ? "unreleased" : "released", surfaces: splitList(row.surfaces).map((s) => surfaceMap[s.toLowerCase()]).filter(Boolean) as Surface[], shippedAt: row.shipped_at || "Unknown", backendChanged: parseBool(row.backend_changed), sharedContractChanged: parseBool(row.shared_contract_changed), schemaChanged: parseBool(row.schema_changed), integrationsChanged: splitList(row.integrations).map(slugify), jiraBackfillRequired: false, deliveredCapabilities: [], releaseNotes: row.description || "", jiraLinks: jiraKeys(String(row.jira_keys || "")).map((key) => ({ key, summary: row.jira_summary || "Imported release linkage", status: "Imported", url: row.jira_url || `https://hobbeast.atlassian.net/browse/${key}` })) });
-    if (type === "capability") capabilities.push({ id: row.record_id || slugify(row.name || "capability"), name: row.name || row.record_id || "Capability", description: row.description || "", statusBySurface: { web: row.status_web as any, "mobile-android": row.status_mobile_android as any, "mobile-ios": row.status_mobile_ios as any, backend: row.status_backend as any, "shared-contract": row.status_shared_contract as any }, parityStatus: (row.parity_status as any) || "planned", integrations: splitList(row.integrations).map(slugify), jiraKeys: jiraKeys(String(row.jira_keys || "")) });
-    if (type === "integration") integrations.push({ id: row.record_id || slugify(row.name || "integration"), name: row.name || row.record_id || "Integration", category: (row.integration_category as any) || "external-api", state: (row.state as any) || "connected", environmentSensitive: parseBool(row.environment_sensitive), notes: row.notes, url: row.jira_url || (row as any).url });
+    if (type === "capability") capabilities.push({ id: row.record_id || slugify(row.name || "capability"), name: row.name || row.record_id || "Capability", description: row.description || "", statusBySurface: { web: row.status_web as any, "mobile-android": row.status_mobile_android as any, "mobile-ios": row.status_mobile_ios as any, backend: row.status_backend as any, "shared-contract": row.status_shared_contract as any }, parityStatus: (row.parity_status as any) || "planned", integrations: splitList(row.integrations).map(slugify), jiraKeys: jiraKeys(String(row.jira_keys || "")), source: "file-import" });
+    if (type === "integration") integrations.push({ id: row.record_id || slugify(row.name || "integration"), name: row.name || row.record_id || "Integration", category: (row.integration_category as any) || "external-api", state: (row.state as any) || "connected", environmentSensitive: parseBool(row.environment_sensitive), notes: row.notes, url: (row as any).url });
     if (type === "jira") {
       const key = row.record_id || jiraKeys(String(row.jira_keys || row.name || ""))[0]; if (!key) continue;
       importedJiraIssues.push({ id: `jira_${key.toLowerCase()}`, key, summary: row.jira_summary || row.name || key, description: row.jira_description || row.description || "", labels: splitList(row.jira_labels), url: row.jira_url || `https://hobbeast.atlassian.net/browse/${key}`, source: "file-import" });
@@ -196,7 +212,7 @@ export function templateCsv() {
     "capability,normalized_places_search,web-v1.0.0,Normalized place search,Canonical place search with provider orchestration,,,,,,,supabase;geoapify;tomtom,APP-102,,,,follow-up-required,,,,",
     "integration,supabase,,Supabase,Shared auth and persistence backend,connected,,,,,,,,,,,,,true,Environment sensitive,,",
     "jira,APP-102,,,,,,,,,,,Normalized place search rollout,Governs place orchestration and contract alignment,surface:web;impact:shared-contract,https://example.atlassian.net/browse/APP-102,,,,"
-  ].join("\\n");
+  ].join("\n");
 }
 export function createTemplateWorkbook() {
   const rows = [{ record_type: "release", record_id: "rel_web_1_0_0", name: "web-v1.0.0", description: "First governed production release", state: "released", shipped_at: "2026-03-28", surfaces: "web,backend,shared-contract", backend_changed: "true", shared_contract_changed: "true", schema_changed: "true", integrations: "supabase,geoapify", jira_keys: "APP-101,APP-102" },

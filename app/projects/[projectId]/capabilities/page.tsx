@@ -1,24 +1,34 @@
-import { notFound } from "next/navigation";
+"use client";
+
 import { AppShell } from "@/components/app-shell";
 import { SectionHeader, StatusBadge } from "@/components/ui";
-import { getProject } from "@/lib/mock-data";
+import { useProjectRecord } from "@/hooks/useProjectRecord";
 
 export default function CapabilitiesPage({ params }: { params: { projectId: string } }) {
-  const project = getProject(params.projectId);
-  if (!project) return notFound();
+  const { project } = useProjectRecord(params.projectId);
+  if (!project) return <AppShell projectId={params.projectId}><div className="card p-6">Project not found.</div></AppShell>;
 
   return (
-    <AppShell projectId={project.id} projectName={project.name}>
+    <AppShell projectId={project.id}>
       <div className="space-y-6">
-        <SectionHeader eyebrow="Capability registry" title={`${project.name} capabilities`} description="Track features independently from commits and map them across product surfaces." />
+        <SectionHeader eyebrow="Capability registry" title={`${project.name} capabilities`} description="Track features independently from commits and map them across product surfaces. Imported Jira work is also surfaced here as capability candidates." />
         <div className="space-y-4">
           {project.capabilities.map((capability) => (
             <div key={capability.id} className="card p-6">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                 <div>
-                  <h3 className="text-lg font-semibold text-slate-900">{capability.name}</h3>
-                  {capability.summary ? <p className="mt-2 text-sm text-slate-600">{capability.summary}</p> : null}
-                  <p className="mt-2 text-sm text-slate-500">Jira: {capability.jiraKeys.join(", ")}</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-lg font-semibold text-slate-900">{capability.name}</h3>
+                    {capability.source === "imported-jira" ? <StatusBadge tone="info">imported-jira</StatusBadge> : null}
+                    {capability.source === "file-import" ? <StatusBadge tone="info">file-import</StatusBadge> : null}
+                  </div>
+                  {capability.description ? <p className="mt-2 text-sm text-slate-600">{capability.description}</p> : null}
+                  <div className="mt-3 flex flex-wrap gap-2 text-sm text-slate-500">
+                    {capability.jiraKeys.length ? capability.jiraKeys.map((key) => {
+                      const linked = project.importedJiraIssues?.find((issue) => issue.key === key);
+                      return linked ? <a key={key} href={linked.url} className="badge badge-neutral hover:bg-slate-100">{key} — {linked.summary}</a> : <span key={key} className="badge badge-neutral">{key}</span>;
+                    }) : <span>Jira: none</span>}
+                  </div>
                 </div>
                 <StatusBadge tone={capability.parityStatus === "aligned" ? "success" : capability.parityStatus === "planned" ? "info" : "warning"}>{capability.parityStatus}</StatusBadge>
               </div>
@@ -30,14 +40,7 @@ export default function CapabilitiesPage({ params }: { params: { projectId: stri
                   </div>
                 ))}
               </div>
-              {(capability.tenant || capability.channel || capability.codebaseStatus || capability.deployStatus) ? (
-                <div className="mt-4 grid gap-3 md:grid-cols-4 text-sm">
-                  {capability.tenant ? <div className="rounded-2xl border border-slate-200 p-3"><div className="text-slate-500">Tenant</div><div className="mt-1 font-medium text-slate-900">{capability.tenant}</div></div> : null}
-                  {capability.channel ? <div className="rounded-2xl border border-slate-200 p-3"><div className="text-slate-500">Channel</div><div className="mt-1 font-medium text-slate-900">{capability.channel}</div></div> : null}
-                  {capability.codebaseStatus ? <div className="rounded-2xl border border-slate-200 p-3"><div className="text-slate-500">Codebase status</div><div className="mt-1 font-medium text-slate-900">{capability.codebaseStatus}</div></div> : null}
-                  {capability.deployStatus ? <div className="rounded-2xl border border-slate-200 p-3"><div className="text-slate-500">Deploy status</div><div className="mt-1 font-medium text-slate-900">{capability.deployStatus}</div></div> : null}
-                </div>
-              ) : null}
+              {capability.integrations.length ? <div className="mt-4 text-xs text-slate-500">Integrations: {capability.integrations.join(", ")}</div> : null}
             </div>
           ))}
         </div>

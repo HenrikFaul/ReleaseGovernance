@@ -1,15 +1,9 @@
 export type Surface = "web" | "mobile-android" | "mobile-ios" | "backend" | "shared-contract";
 export type CapabilityStatus = "planned" | "partial" | "shipped" | "deprecated";
 export type DeploymentStatus = "healthy" | "warning" | "failing";
+export type ReleaseState = "released" | "unreleased";
 export type ReleaseStatus = "current" | "old" | "unreleased";
-export type ReleaseLifecycleState = "released" | "unreleased";
-export type ReleaseSourceKind =
-  | "github"
-  | "uploaded-snapshot"
-  | "markdown-import"
-  | "jira-import"
-  | "manual"
-  | "unknown";
+export type ReleaseSourceKind = "github" | "uploaded-snapshot" | "markdown-import" | "jira-import" | "manual" | "unknown";
 
 export interface JiraLink {
   key: string;
@@ -24,23 +18,16 @@ export interface ImportedJiraIssue {
   id: string;
   key: string;
   summary: string;
-  description: string;
+  description?: string;
   labels: string[];
   url: string;
-  source: "file-import" | "jira-url-import" | "manual";
+  source: "jira-url" | "jira-project" | "file-import";
 }
 
 export interface IntegrationRef {
   id: string;
   name: string;
-  category:
-    | "source-control"
-    | "planning"
-    | "deployment"
-    | "backend"
-    | "external-api"
-    | "design"
-    | "documentation";
+  category: "source-control" | "planning" | "deployment" | "backend" | "external-api" | "design" | "documentation";
   state: "connected" | "attention" | "planned";
   environmentSensitive?: boolean;
   notes?: string;
@@ -60,7 +47,7 @@ export interface ReleaseItem {
   id: string;
   version: string;
   status?: ReleaseStatus;
-  releaseState?: ReleaseLifecycleState;
+  releaseState?: ReleaseState;
   surfaces: Surface[];
   shippedAt: string;
   backendChanged: boolean;
@@ -89,6 +76,7 @@ export interface CapabilityRecord {
   channel?: "Webapp" | "Mobile" | "Both";
   codebaseStatus?: string;
   deployStatus?: string;
+  source?: "seed" | "file-import" | "imported-jira";
 }
 
 export interface ParityAlert {
@@ -129,6 +117,13 @@ export interface ProjectRecord {
   overview?: ProjectOverview;
 }
 
+export interface TenantRecord {
+  id: string;
+  name: string;
+  plan: "starter" | "growth" | "enterprise";
+  projects: ProjectRecord[];
+}
+
 export interface ProjectImportBundle {
   releases: ReleaseItem[];
   capabilities: CapabilityRecord[];
@@ -136,16 +131,4 @@ export interface ProjectImportBundle {
   importedJiraIssues: ImportedJiraIssue[];
 }
 
-export interface ProjectOverride {
-  releases?: ReleaseItem[];
-  capabilities?: CapabilityRecord[];
-  integrations?: IntegrationRef[];
-  importedJiraIssues?: ImportedJiraIssue[];
-}
-
-export interface TenantRecord {
-  id: string;
-  name: string;
-  plan: "starter" | "growth" | "enterprise";
-  projects: ProjectRecord[];
-}
+export interface ProjectOverride extends Partial<ProjectImportBundle> {}
