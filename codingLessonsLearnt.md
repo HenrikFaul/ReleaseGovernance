@@ -131,3 +131,18 @@ Minden új hiba a következő struktúrában kerüljön be:
 - [ ] A Jira key-ek validáltak.
 - [ ] A valid Jira issue-k nem lettek indokolatlanul levágva.
 - [ ] A build lefutott vagy legalább célzottan ellenőriztem a módosított töréspontokat.
+
+
+### [013] Authoritative Jira source hierarchy rossz kezelése
+- **Tünet / log:** a Syncfolk seedben fals Jira key-ek maradtak bent, majd egy későbbi javításnál túl kevés valid Jira issue maradt meg.
+- **Kiváltó ok:** a markdown inventoryk Jira hivatkozásai részben nem valós kulcsok voltak, miközben a tényleges authoritative forrás a `jiraissues.csv`. Először validálatlanul kerültek be kulcsok, utána pedig túl agresszíven csak a markdownban szereplő valid kulcsok maradtak bent.
+- **Javítás:** forráshierarchia rögzítése: `jiraissues.csv` az authoritative issue source, a markdown inventoryk az authoritative funkcionális értelmezési források. A seedben minden valid CSV issue-nak bent kell maradnia, és a markdown csak a grouping / implemented-vs-planned értelmezést adhatja.
+- **Megelőzés:** Jira key-eket soha ne a markdownból tekints authoritative-nak. Először a valid CSV issue universe-t kell felépíteni, utána arra kell ráilleszteni a markdown business groupinget.
+- **Ellenőrzés:** a seedben szereplő összes Jira key legyen részhalmaza a CSV-nek, és a CSV összes valid issue-ja legyen lefedve imported Jira issue-ként vagy grouping szinten.
+
+### [014] Changelog append-only governance hiánya
+- **Tünet / log:** új fejlesztési körökben nem volt egyértelműen rögzítve, hogy a korábbi leszállított funkciókat nem szabad regresszióval kivenni, és a changeloghoz hozzá kell appendelni minden új változást.
+- **Kiváltó ok:** a changelogot korábban pusztán release note-ként kezeltük, nem pedig fejlesztési governance dokumentumként.
+- **Javítás:** a `CHANGELOG.md` tetejére kötelező “how to use” blokk került, amely előírja az olvasási, appendelési és regresszió-ellenőrzési szabályokat.
+- **Megelőzés:** minden fejlesztési kör elején olvasd el a changelogot is a coding lessons mellett.
+- **Ellenőrzés:** új patch átadása előtt legyen frissítve a changelog Added / Changed / Fixed blokkja, és ne hiányozzon belőle a mostani kör.
