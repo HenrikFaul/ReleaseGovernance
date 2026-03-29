@@ -132,50 +132,16 @@ Minden új hiba a következő struktúrában kerüljön be:
 - [ ] A valid Jira issue-k nem lettek indokolatlanul levágva.
 - [ ] A build lefutott vagy legalább célzottan ellenőriztem a módosított töréspontokat.
 
-### [013] Authoritative Jira source hierarchy rossz kezelése
-- **Tünet / log:** a Syncfolk seedben fals Jira key-ek maradtak bent, majd egy későbbi javításnál túl kevés valid Jira issue maradt meg.
-- **Kiváltó ok:** a markdown inventoryk Jira hivatkozásai részben nem valós kulcsok voltak, miközben a tényleges authoritative forrás a `jiraissues.csv`. Először validálatlanul kerültek be kulcsok, utána pedig túl agresszíven csak a markdownban szereplő valid kulcsok maradtak bent.
-- **Javítás:** forráshierarchia rögzítése: `jiraissues.csv` az authoritative issue source, a markdown inventoryk az authoritative funkcionális értelmezési források. A seedben minden valid CSV issue-nak bent kell maradnia, és a markdown csak a grouping / implemented-vs-planned értelmezést adhatja.
-- **Megelőzés:** Jira key-eket soha ne a markdownból tekints authoritative-nak. Először a valid CSV issue universe-t kell felépíteni, utána arra kell ráilleszteni a markdown business groupinget.
-- **Ellenőrzés:** a seedben szereplő összes Jira key legyen részhalmaza a CSV-nek, és a CSV összes valid issue-ja legyen lefedve imported Jira issue-ként vagy grouping szinten.
+### [017] Placeholder Hobbeast Jira linkage left in seed despite full validated export existing
+- **Tünet / log:** a Hobbeast release oldal csak néhány Jira issue-t mutatott, miközben a feltöltött `jiraissues_HOBBEAST.csv` 186 valid issue-t tartalmazott.
+- **Kiváltó ok:** a Hobbeast seed régi placeholder release-linkeket tartott meg, és nem lett ugyanazzal a teljes-validációs logikával újraépítve, mint a Syncfolk.
+- **Javítás:** a Hobbeast seedet újra kellett építeni úgy, hogy a `jiraissues_HOBBEAST.csv` legyen az authoritative issue source, az uploaded Hobbeast markdown inventoryk pedig a released-vs-unreleased funkcionális értelmezést adják. Az összes valid issue maradjon bent `importedJiraIssues` alatt, miközben a released/current-workstream és unreleased/spec-only csoportosítás külön történik meg.
+- **Megelőzés:** ha egy projekthez teljes Jira export áll rendelkezésre, nem maradhatnak a seedben kézi placeholder Jira-linkek. A seed akkor kész, ha a validált issue-universe teljes száma és a grouping számai egyeznek a tervezett logikával.
+- **Ellenőrzés:** számold meg a valid Jira issue-kat a CSV-ben, és ellenőrizd, hogy ugyanennyi issue szerepel-e `importedJiraIssues` alatt. Külön ellenőrizd a released és unreleased csoportok unióját is.
 
-### [014] Changelog append-only governance hiánya
-- **Tünet / log:** új fejlesztési körökben nem volt egyértelműen rögzítve, hogy a korábbi leszállított funkciókat nem szabad regresszióval kivenni, és a changeloghoz hozzá kell appendelni minden új változást.
-- **Kiváltó ok:** a changelogot korábban pusztán release note-ként kezeltük, nem pedig fejlesztési governance dokumentumként.
-- **Javítás:** a `CHANGELOG.md` tetejére kötelező “how to use” blokk került, amely előírja az olvasási, appendelési és regresszió-ellenőrzési szabályokat.
-- **Megelőzés:** minden fejlesztési kör elején olvasd el a changelogot is a coding lessons mellett.
-- **Ellenőrzés:** új patch átadása előtt legyen frissítve a changelog Added / Changed / Fixed blokkja, és ne hiányozzon belőle a mostani kör.
-
-### [015] Current repo evidence must override broader historical markdown claims
-- **Tünet / log:** a Hobbeast inventory md-k több olyan területet is „implemented” vagy nagyon előrehaladott állapotúnak mutattak (pl. hidden hubs, fejlettebb analytics), amelyeket a most feltöltött aktuális repo nem támasztott alá közvetlenül.
-- **Kiváltó ok:** a dokumentáció több korábbi workstream-értelmezést és backlog-visszavezetést kevert a jelenlegi feltöltött web repo állapotával.
-- **Javítás:** evidence-tier modell bevezetése:
-  1. Jira CSV = létező issue-univerzum,
-  2. feltöltött repo = jelenlegi kódbizonyíték,
-  3. md inventory = üzleti értelmezési réteg, de nem automatikus runtime-bizonyíték.
-- **Megelőzés:** ha a user kódbázist is ad, akkor minden „implemented” állítást a feltöltött repo alapján újra kell validálni.
-- **Ellenőrzés:** minden current-runtime claimhez legyen konkrét repo-evidence (fájl, migration, edge function, page vagy builderedmény).
-
-### [016] Nem elég, hogy a Jira kulcs valid – a coverage teljességét is ellenőrizni kell
-- **Tünet / log:** a Hobbeast md-kben szereplő Jira kulcsok ugyan validak voltak, de sok jelenlegi repo által már bizonyított story-szintű issue hiányzott belőlük.
-- **Kiváltó ok:** az eredeti inventoryk inkább epic- és nagyblokk-szinten foglalták össze az állapotot, ezért a ténylegesen elkészült story-k egy része nem jelent meg bennük.
-- **Javítás:** a validált pack hozzáadta a hiányzó repo-evidenced story-kat a capability/release értelmezéshez.
-- **Megelőzés:** Jira-validálás után mindig csinálj egy második lépést: repo-evidenced feature family → hiányzó releváns Jira storyk.
-- **Ellenőrzés:** ha egy feature bizonyítottan ott van a repo-ban, akkor legyen legalább az epicje és a fő story-jai bent a governance mappingben.
-
-### [017] Exact-summary duplicate Jira családok kettős számolást okozhatnak
-- **Tünet / log:** a Hobbeast CSV-ben több azonos summary-jú, de külön Jira key-jű issue-család van (pl. `HOB-140/HOB-141`, `HOB-208..211`, `HOB-205/HOB-206`).
-- **Kiváltó ok:** ismételt issue-létrehozás / backfill során több azonos tartalmú jegy is létrejött.
-- **Javítás:** minden valid issue maradjon bent imported Jira traceability-ként, de a capability/release mappinghez egy canonical representative key-t kell választani.
-- **Megelőzés:** CSV import után mindig futtasd le a duplicate-summary ellenőrzést.
-- **Ellenőrzés:** a release és capability számlálók ne duplázzanak csak azért, mert azonos summary több key alatt is létezik.
-
-### [018] A zöld build nem egyenlő a release-igazsággal
-- **Tünet / log:** a Hobbeast feltöltött repo lokálisan lebuildelt, mégsem lenne őszinte automatikusan `healthy` release-állapotot adni neki.
-- **Kiváltó ok:** a build csak a frontend bundle-konzisztenciát ellenőrzi; nem bizonyítja a production deployt, a remote schema teljességét vagy a runtime integrációk tényleges környezeti működését.
-- **Javítás:** a governance seedben külön kezeld:
-  - build health,
-  - schema completeness,
-  - production/release confidence.
-- **Megelőzés:** soha ne azonosítsd a „build passed” állapotot a „shipped and healthy” állapottal.
-- **Ellenőrzés:** ha nincs teljes runtime/prod audit, a deployment státusz maradjon `warning`.
+### [018] Implemented-vs-unreleased classification must use inventories, not naïve epic completion assumptions
+- **Tünet / log:** könnyű lenne minden issue-t egyszerűen root epic szerint releasednek vagy unreleasednek tekinteni, ami félrevezető capability képet adna.
+- **Kiváltó ok:** a Jira státuszok és epic-hierarchiák önmagukban nem fedik pontosan a jelenlegi workstream valós állapotát; a Hobbeast inventoryk külön jelzik, hogy több domain implemented/current workstream, míg a parity/documentation follow-up Jira/spec only.
+- **Javítás:** a markdown inventoryk alapján kell kijelölni az implemented/current-workstream domain roots-okat, és a parity/documentation stories-t külön unreleased capability/release csoportokba kell tenni még akkor is, ha parentjük egy implemented domain alatt van.
+- **Megelőzés:** mindig rögzítsd a forráshierarchiát: 1) valid Jira CSV/export, 2) detailed markdown inventory functional interpretation, 3) repository/runtime evidence, 4) logikai grouping.
+- **Ellenőrzés:** parity és documentation follow-up issue-k ne szivárogjanak vissza released csoportokba csak azért, mert parentjük egy implemented root alatt van.
