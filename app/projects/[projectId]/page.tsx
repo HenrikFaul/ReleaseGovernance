@@ -1,22 +1,21 @@
+"use client";
+
 import Link from "next/link";
-import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { SectionHeader, StatCard, StatusBadge } from "@/components/ui";
 import { evaluateReleaseImpact } from "@/lib/impact-engine";
-import { getProject } from "@/lib/mock-data";
+import { useProjectRecord } from "@/hooks/useProjectRecord";
 
 export default function ProjectDashboardPage({ params }: { params: { projectId: string } }) {
-  const project = getProject(params.projectId);
-  if (!project) return notFound();
+  const { project, stats } = useProjectRecord(params.projectId);
+  if (!project) return <AppShell projectId={params.projectId}><div className="card p-6">Project not found.</div></AppShell>;
 
-  const openAlerts = project.parityAlerts.filter((alert) => alert.state !== "resolved");
-  const releasedReleases = project.releases.filter((release) => release.stage !== "unreleased");
-  const unreleasedReleases = project.releases.filter((release) => release.stage === "unreleased");
-  const latestRelease = releasedReleases[0];
+  const openAlerts = project.parityAlerts.filter((a) => a.state !== "resolved");
+  const latestRelease = project.releases.filter((r) => (r.releaseState ?? "released") === "released")[0];
   const impact = latestRelease ? evaluateReleaseImpact(latestRelease) : null;
 
   return (
-    <AppShell project={project}>
+    <AppShell projectId={project.id}>
       <div className="space-y-6">
         <SectionHeader
           eyebrow="Project dashboard"
@@ -24,15 +23,13 @@ export default function ProjectDashboardPage({ params }: { params: { projectId: 
           description="Unified governance view across product surfaces, shared backend, integrations and delivery documentation."
           actions={<StatusBadge tone={project.deploymentStatus === "healthy" ? "success" : project.deploymentStatus === "warning" ? "warning" : "danger"}>{project.deploymentStatus}</StatusBadge>}
         />
-
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-          <StatCard label="Released versions" value={String(releasedReleases.length)} helper="Tracked shipped releases" />
-          <StatCard label="Unreleased tracks" value={String(unreleasedReleases.length)} helper="Planned but not yet deployed" />
-          <StatCard label="Capabilities" value={String(project.capabilities.length)} helper="Imported from inventories and Jira" />
+          <StatCard label="Released versions" value={String(stats.releasedCount)} helper="Shipped versions" />
+          <StatCard label="Unreleased groups" value={String(stats.unreleasedCount)} helper="Planned but not shipped" />
+          <StatCard label="Capabilities" value={String(project.capabilities.length)} helper="Tracked independently from commits" />
           <StatCard label="Open parity alerts" value={String(openAlerts.length)} helper="Cross-surface follow-up required" />
-          <StatCard label="Connected integrations" value={String(project.integrations.length)} helper="Source systems and external APIs" />
+          <StatCard label="Imported Jira items" value={String(stats.importedJiraCount)} helper="Clickable imported work items" />
         </div>
-
         <div className="grid gap-6 xl:grid-cols-[1.1fr,0.9fr]">
           <section className="card p-6">
             <div className="flex items-center justify-between">
@@ -52,21 +49,11 @@ export default function ProjectDashboardPage({ params }: { params: { projectId: 
                   <li>Schema changed: {String(latestRelease.schemaChanged)}</li>
                   <li>Integrations touched: {latestRelease.integrationsChanged.join(", ") || "none"}</li>
                 </ul>
-                {impact ? (
-                  <div className="rounded-2xl bg-slate-50 p-4">
-                    <div className="font-medium text-slate-900">Impact engine</div>
-                    <p className="mt-2 text-slate-600">{impact.reasons.join(" ")}</p>
-                  </div>
-                ) : null}
-                <Link href={`/projects/${project.id}/releases/${latestRelease.id}`} className="inline-flex rounded-2xl bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700">
-                  Open release detail
-                </Link>
+                {impact ? <div className="rounded-2xl bg-slate-50 p-4"><div className="font-medium text-slate-900">Impact engine</div><p className="mt-2 text-slate-600">{impact.reasons.join(" ")}</p></div> : null}
+                <Link href={`/projects/${project.id}/releases/${latestRelease.id}`} className="inline-flex rounded-2xl bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700">Open release detail</Link>
               </div>
-            ) : (
-              <div className="mt-4 text-sm text-slate-500">No released versions yet.</div>
-            )}
+            ) : <div className="mt-4 text-sm text-slate-500">No released records yet.</div>}
           </section>
-
           <section className="card p-6">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold text-slate-900">Open parity alerts</h3>

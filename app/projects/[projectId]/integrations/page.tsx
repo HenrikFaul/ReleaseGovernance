@@ -1,14 +1,15 @@
-import { notFound } from "next/navigation";
+"use client";
+
 import { AppShell } from "@/components/app-shell";
 import { SectionHeader, StatusBadge } from "@/components/ui";
-import { getProject } from "@/lib/mock-data";
+import { useProjectRecord } from "@/hooks/useProjectRecord";
 
 export default function IntegrationsPage({ params }: { params: { projectId: string } }) {
-  const project = getProject(params.projectId);
-  if (!project) return notFound();
+  const { project } = useProjectRecord(params.projectId);
+  if (!project) return <AppShell projectId={params.projectId}><div className="card p-6">Project not found.</div></AppShell>;
 
   return (
-    <AppShell project={project}>
+    <AppShell projectId={project.id}>
       <div className="space-y-6">
         <SectionHeader eyebrow="Integrations hub" title={`${project.name} toolchain and API registry`} description="Show connected source systems and all externally governed APIs or services." />
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -22,6 +23,7 @@ export default function IntegrationsPage({ params }: { params: { projectId: stri
                 <StatusBadge tone={integration.state === "connected" ? "success" : integration.state === "attention" ? "warning" : "info"}>{integration.state}</StatusBadge>
               </div>
               {integration.notes ? <p className="mt-3 text-sm text-slate-600">{integration.notes}</p> : null}
+              {integration.url ? <a href={integration.url} className="mt-3 block text-sm text-brand-700 underline">Open integration reference</a> : null}
               {integration.environmentSensitive ? <div className="mt-3 text-xs text-amber-700">Environment or secret sensitivity applies.</div> : null}
             </div>
           ))}

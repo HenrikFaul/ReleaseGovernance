@@ -1,25 +1,22 @@
 import Link from "next/link";
 import { ReactNode } from "react";
-import { ProjectRecord } from "@/lib/types";
 
-interface AppShellProps {
-  children: ReactNode;
-  project?: ProjectRecord;
+function navigation(projectId?: string) {
+  if (!projectId) return [{ href: "/projects", label: "Projects" }];
+  return [
+    { href: "/projects", label: "Projects" },
+    { href: `/projects/${projectId}`, label: "Dashboard" },
+    { href: `/projects/${projectId}/releases`, label: "Releases" },
+    { href: `/projects/${projectId}/capabilities`, label: "Capabilities" },
+    { href: `/projects/${projectId}/integrations`, label: "Integrations" },
+    { href: `/projects/${projectId}/traceability`, label: "Traceability" },
+    { href: `/projects/${projectId}/automation`, label: "Automation" },
+    { href: `/projects/${projectId}/import`, label: "Import" },
+  ];
 }
 
-export function AppShell({ children, project }: AppShellProps) {
-  const navigation = project
-    ? [
-        { href: "/projects", label: "Projects" },
-        { href: `/projects/${project.id}`, label: "Dashboard" },
-        { href: `/projects/${project.id}/releases`, label: "Releases" },
-        { href: `/projects/${project.id}/capabilities`, label: "Capabilities" },
-        { href: `/projects/${project.id}/integrations`, label: "Integrations" },
-        { href: `/projects/${project.id}/traceability`, label: "Traceability" },
-        { href: `/projects/${project.id}/automation`, label: "Automation" },
-      ]
-    : [{ href: "/projects", label: "Projects" }];
-
+export function AppShell({ children, projectId }: { children: ReactNode; projectId?: string }) {
+  const items = navigation(projectId);
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="mx-auto flex max-w-7xl gap-6 px-4 py-6 lg:px-8">
@@ -28,15 +25,9 @@ export function AppShell({ children, project }: AppShellProps) {
             <div className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-600">ReleaseGovernance</div>
             <h1 className="mt-2 text-xl font-semibold text-slate-900">B2B governance cockpit</h1>
             <p className="mt-2 text-sm text-slate-600">Multi-tenant release governance for web, mobile and shared backend products.</p>
-            {project ? (
-              <div className="mt-4 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                Selected project
-                <div className="mt-1 font-semibold text-slate-900">{project.name}</div>
-              </div>
-            ) : null}
           </div>
           <nav className="mt-8 space-y-2">
-            {navigation.map((item) => (
+            {items.map((item) => (
               <Link key={item.href} href={item.href} className="block rounded-xl px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-100">
                 {item.label}
               </Link>

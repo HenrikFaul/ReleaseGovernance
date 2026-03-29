@@ -11,7 +11,7 @@ export default function ProjectsPage() {
         <SectionHeader
           eyebrow="Workspace"
           title={tenant.name}
-          description="Choose a governed product project. Project-scoped navigation becomes available after you select a project."
+          description="Choose a governed product project. Project-specific menus remain hidden until a project is selected."
           actions={<StatusBadge tone="info">{tenant.plan} plan</StatusBadge>}
         />
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
