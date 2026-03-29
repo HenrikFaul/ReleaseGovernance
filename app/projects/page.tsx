@@ -1,21 +1,22 @@
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { SectionHeader, StatusBadge } from "@/components/ui";
-import { tenants } from "@/lib/mock-data";
+import { getTenant } from "@/lib/mock-data";
 
 export default function ProjectsPage() {
-  const tenant = tenants[0];
+  const tenant = getTenant("tenant_releasegovernance");
+
   return (
     <AppShell>
       <div className="space-y-6">
         <SectionHeader
           eyebrow="Workspace"
-          title={tenant.name}
+          title={tenant?.name ?? "ReleaseGovernance Workspace"}
           description="Choose a governed product project. Project-specific sections become visible after a project is selected."
-          actions={<StatusBadge tone="info">{tenant.plan} plan</StatusBadge>}
+          actions={<StatusBadge tone="info">{tenant?.plan ?? "growth"} plan</StatusBadge>}
         />
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {tenant.projects.map((project) => (
+          {(tenant?.projects ?? []).map((project) => (
             <Link key={project.id} href={`/projects/${project.id}`} className="card p-6 transition hover:-translate-y-0.5">
               <div className="flex items-start justify-between gap-3">
                 <div>

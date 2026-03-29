@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { tenants } from "@/lib/mock-data";
+import { getTenant } from "@/lib/mock-data";
 
 export async function GET() {
-  return NextResponse.json({ tenants });
+  const tenant = getTenant("tenant_releasegovernance");
+  return NextResponse.json({ tenants: tenant ? [tenant] : [] });
 }
