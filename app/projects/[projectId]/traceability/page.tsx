@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { SectionHeader, StatusBadge } from "@/components/ui";
 import { getProject } from "@/lib/mock-data";
+import { summarizeBackfill } from "@/lib/backfill";
 
 export default function TraceabilityPage({ params }: { params: { projectId: string } }) {
   const project = getProject(params.projectId);
@@ -21,7 +22,7 @@ export default function TraceabilityPage({ params }: { params: { projectId: stri
 
   const releasedIssues = (project.importedJiraIssues ?? []).filter((issue) => releasedJiraKeys.has(issue.key));
   const unreleasedIssues = (project.importedJiraIssues ?? []).filter((issue) => !releasedJiraKeys.has(issue.key) || unreleasedJiraKeys.has(issue.key));
-  const backfillCandidates = project.backfillCandidates ?? [];
+  const backfill = summarizeBackfill(project);
 
   return (
     <AppShell projectId={project.id} projectName={project.name}>
@@ -68,7 +69,7 @@ export default function TraceabilityPage({ params }: { params: { projectId: stri
         <section className="card p-6">
           <h3 className="text-lg font-semibold text-slate-900">Deployed features without Jira tickets</h3>
           <div className="mt-4 space-y-3">
-            {backfillCandidates.length ? backfillCandidates.map((candidate) => (
+            {backfill.unresolved.length ? backfill.unresolved.map((candidate) => (
               <div key={candidate.id} className="rounded-2xl border border-slate-200 p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div className="font-medium text-slate-900">{candidate.featureName}</div>

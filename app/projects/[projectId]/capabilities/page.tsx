@@ -3,9 +3,11 @@
 import { AppShell } from "@/components/app-shell";
 import { SectionHeader, StatusBadge } from "@/components/ui";
 import { useProjectRecord } from "@/hooks/useProjectRecord";
+import { summarizeBackfill } from "@/lib/backfill";
 
 function sectionedCapabilities(project: NonNullable<ReturnType<typeof useProjectRecord>["project"]>) {
   const releaseByVersion = new Map(project.releases.map((release) => [release.version, release]));
+  const backfill = summarizeBackfill(project);
   const released = project.capabilities.filter((capability) =>
     Object.values(capability.firstRelease ?? {}).some((version) => {
       const release = releaseByVersion.get(version);
@@ -91,10 +93,15 @@ export default function CapabilitiesPage({ params }: { params: { projectId: stri
 
         <section className="space-y-4">
           <div className="card p-5">
-            <h3 className="text-lg font-semibold text-slate-900">Deployed features without Jira tickets</h3>
-            <p className="mt-2 text-sm text-slate-600">These shipped features were detected in the product or governance layer but still need a formal Jira story so they can later move into the unreleased section as normal tracked work.</p>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900">Deployed features without Jira tickets</h3>
+                <p className="mt-2 text-sm text-slate-600">These shipped features were detected in the product or governance layer but still need a formal Jira story so they can later move into the unreleased section as normal tracked work.</p>
+              </div>
+              <a href={`/projects/${project.id}/automation`} className="inline-flex rounded-2xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Export Jira CSV</a>
+            </div>
           </div>
-          {backfillCandidates.length ? backfillCandidates.map((candidate) => (
+          {backfill.unresolved.length ? backfill.unresolved.map((candidate) => (
             <div key={candidate.id} className="card p-6">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                 <div>
@@ -122,7 +129,38 @@ export default function CapabilitiesPage({ params }: { params: { projectId: stri
               </div>
             </div>
           )) : (
-            <div className="card p-6 text-sm text-slate-600">No backfill candidates detected.</div>
+            <div className="card p-6 text-sm text-slate-600">No unresolved backfill candidates detected.</div>
+          )}
+        </section>
+
+        <section className="space-y-4">
+          <div className="card p-5">
+            <h3 className="text-lg font-semibold text-slate-900">Backfill candidates already linked to Jira</h3>
+            <p className="mt-2 text-sm text-slate-600">If an imported Jira issue contains a unique backfill tracking label, the feature is no longer an orphaned shipped capability. It becomes standard Jira-tracked work.</p>
+          </div>
+          {backfill.resolved.length ? backfill.resolved.map(({ candidate, matchingIssues }) => (
+            <div key={candidate.id} className="card p-6">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-900">{candidate.featureName}</h3>
+                  <p className="mt-2 text-sm text-slate-600">{candidate.description}</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {candidate.labels.map((label) => <span key={label} className="badge badge-neutral">{label}</span>)}
+                  </div>
+                </div>
+                <StatusBadge tone="success">Jira story detected</StatusBadge>
+              </div>
+              <div className="mt-4 space-y-2">
+                {matchingIssues.map((issue) => (
+                  <a key={issue.key} href={issue.url} className="block rounded-2xl bg-slate-50 p-4 hover:bg-slate-100">
+                    <div className="text-sm font-medium text-slate-900">{issue.key} — {issue.summary}</div>
+                    {issue.description ? <div className="mt-1 text-sm text-slate-600">{issue.description}</div> : null}
+                  </a>
+                ))}
+              </div>
+            </div>
+          )) : (
+            <div className="card p-6 text-sm text-slate-600">No imported Jira issue currently matches a backfill tracking label.</div>
           )}
         </section>
       </div>

@@ -50,3 +50,10 @@ Kötelező szabályok:
 - **Javítás:** a traceability oldalon külön kell mutatni a released Jira-linked worköt, az unreleased Jira worköt és a Jira nélküli backfill-jelölteket.
 - **Megelőzés:** traceability nézet tervezésekor három külön halmazzal kell számolni.
 - **Ellenőrzés:** az összes importált Jira elem és az összes backfill candidate látszódjon valamilyen szekcióban.
+
+### [017] Hidden governance functionality is effectively missing functionality
+- **Tünet / visszajelzés:** a backfill logika részben megvolt az adatokban, de a felhasználó nem látta a gombot, az export utat és a resolved/unresolved állapotot a felületen.
+- **Kiváltó ok:** túl sok governance viselkedés maradt implicit a mock-data vagy CSV export szintjén, és nem lett elég egyértelmű UI-belépési pont hozzá.
+- **Javítás:** a backfill életciklust külön, láthatóan kell megjeleníteni a dashboardon, a capabilities oldalon, a traceability oldalon és az automation oldalon is.
+- **Megelőzés:** ha egy funkcióhoz több lépéses operatív folyamat tartozik (pl. export -> Jira import -> visszaimport -> státuszváltás), annak legyen UI-szintű belépési pontja és státuszkijelzése, ne csak adatmodellje.
+- **Ellenőrzés:** release előtt végig kell kattintani, hogy a felhasználó a képernyőről el tudja-e indítani a folyamatot, és látja-e a "mi történt már / mi hiányzik még" állapotot.

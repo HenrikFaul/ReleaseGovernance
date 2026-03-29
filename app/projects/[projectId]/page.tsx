@@ -4,6 +4,7 @@ import { AppShell } from "@/components/app-shell";
 import { SectionHeader, StatCard, StatusBadge } from "@/components/ui";
 import { evaluateReleaseImpact } from "@/lib/impact-engine";
 import { getProject } from "@/lib/mock-data";
+import { summarizeBackfill } from "@/lib/backfill";
 
 export default function ProjectDashboardPage({ params }: { params: { projectId: string } }) {
   const project = getProject(params.projectId);
@@ -23,7 +24,8 @@ export default function ProjectDashboardPage({ params }: { params: { projectId: 
       deployedReleases.some((release) => release.version === value)
     )
   );
-  const backfillCount = project.backfillCandidates?.length ?? 0;
+  const backfill = summarizeBackfill(project);
+  const backfillCount = backfill.unresolved.length;
 
   return (
     <AppShell projectId={project.id} projectName={project.name}>
@@ -46,6 +48,44 @@ export default function ProjectDashboardPage({ params }: { params: { projectId: 
           <StatCard label="Backfill candidates" value={String(backfillCount)} helper="Deployed without Jira" />
           <StatCard label="Open parity alerts" value={String(openAlerts.length)} helper="Cross-surface follow-up required" />
           <StatCard label="Connected integrations" value={String(project.integrations.length)} helper="Source systems and external APIs" />
+        </div>
+
+        <div className="grid gap-6 xl:grid-cols-[1.1fr,0.9fr]">
+          <section className="card p-6">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900">Deployed features without Jira tickets</h3>
+                <p className="mt-2 text-sm text-slate-600">These are already-detected shipped features that still need Jira creation and CSV export. Once their unique backfill labels appear on imported Jira issues, they move out of this queue and into normal unreleased Jira tracking.</p>
+              </div>
+              <Link href={`/projects/${project.id}/automation`} className="inline-flex rounded-2xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+                Open export
+              </Link>
+            </div>
+            <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <div className="rounded-2xl bg-slate-50 p-4">
+                <div className="text-sm text-slate-500">Needs Jira backfill</div>
+                <div className="mt-2 text-2xl font-semibold text-slate-900">{backfill.unresolved.length}</div>
+              </div>
+              <div className="rounded-2xl bg-slate-50 p-4">
+                <div className="text-sm text-slate-500">Already linked back to Jira</div>
+                <div className="mt-2 text-2xl font-semibold text-slate-900">{backfill.resolved.length}</div>
+              </div>
+              <div className="rounded-2xl bg-slate-50 p-4">
+                <div className="text-sm text-slate-500">CSV rows ready</div>
+                <div className="mt-2 text-2xl font-semibold text-slate-900">{backfill.csvRows.length}</div>
+              </div>
+            </div>
+          </section>
+
+          <section className="card p-6">
+            <h3 className="text-lg font-semibold text-slate-900">Backfill lifecycle</h3>
+            <ol className="mt-4 space-y-3 text-sm text-slate-600">
+              <li>1. Export unresolved backfill rows from the Automation page as Jira-importable CSV.</li>
+              <li>2. Import them into Jira with the generated unique tracking label preserved.</li>
+              <li>3. Re-import Jira items into this project.</li>
+              <li>4. ReleaseGovernance will detect the matching label and treat the feature as Jira-backed work instead of a Jira-less deployed exception.</li>
+            </ol>
+          </section>
         </div>
 
         <div className="grid gap-6 xl:grid-cols-[1.15fr,0.85fr]">

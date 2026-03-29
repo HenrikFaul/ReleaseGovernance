@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { SectionHeader } from "@/components/ui";
 import { getProject } from "@/lib/mock-data";
+import { summarizeBackfill } from "@/lib/backfill";
 
 function escapeCsv(value: string) {
   const normalized = value.replace(/"/g, '""');
@@ -12,7 +13,9 @@ export default function AutomationPage({ params }: { params: { projectId: string
   const project = getProject(params.projectId);
   if (!project) return notFound();
 
-  const rows = (project.backfillCandidates ?? []).map((candidate) => ({
+  const backfill = summarizeBackfill(project);
+
+  const rows = backfill.csvRows.map((candidate) => ({
     issueType: candidate.issueType,
     summary: candidate.summary,
     description: candidate.description,
@@ -68,6 +71,12 @@ export default function AutomationPage({ params }: { params: { projectId: string
             </a>
           </div>
 
+          <div className="mt-4 grid gap-4 md:grid-cols-3">
+            <div className="rounded-2xl bg-slate-50 p-4 text-sm"><div className="text-slate-500">Unresolved backfill candidates</div><div className="mt-1 text-xl font-semibold text-slate-900">{backfill.unresolved.length}</div></div>
+            <div className="rounded-2xl bg-slate-50 p-4 text-sm"><div className="text-slate-500">Already linked to Jira</div><div className="mt-1 text-xl font-semibold text-slate-900">{backfill.resolved.length}</div></div>
+            <div className="rounded-2xl bg-slate-50 p-4 text-sm"><div className="text-slate-500">CSV export rows</div><div className="mt-1 text-xl font-semibold text-slate-900">{rows.length}</div></div>
+          </div>
+
           <div className="mt-6 overflow-x-auto">
             <table className="min-w-full border-collapse text-left text-sm">
               <thead>
@@ -98,6 +107,30 @@ export default function AutomationPage({ params }: { params: { projectId: string
           {rows.length ? (
             <pre className="mt-6 overflow-x-auto rounded-2xl bg-slate-950 p-4 text-xs text-slate-100">{csv}</pre>
           ) : null}
+
+          <div className="mt-6 rounded-2xl border border-slate-200 p-4">
+            <h4 className="text-sm font-semibold text-slate-900">Already linked back to Jira</h4>
+            <p className="mt-2 text-sm text-slate-600">When the generated unique backfill label shows up on an imported Jira issue, ReleaseGovernance can detect that the deployed feature now has a proper Jira story.</p>
+            <div className="mt-4 space-y-3">
+              {backfill.resolved.length ? backfill.resolved.map(({ candidate, matchingIssues }) => (
+                <div key={candidate.id} className="rounded-2xl bg-slate-50 p-4">
+                  <div className="font-medium text-slate-900">{candidate.featureName}</div>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {candidate.labels.map((label) => <span key={label} className="badge badge-neutral">{label}</span>)}
+                  </div>
+                  <div className="mt-3 space-y-2">
+                    {matchingIssues.map((issue) => (
+                      <a key={issue.key} href={issue.url} className="block rounded-2xl border border-slate-200 bg-white p-3 hover:bg-slate-100">
+                        <div className="text-sm font-medium text-slate-900">{issue.key} — {issue.summary}</div>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )) : (
+                <div className="text-sm text-slate-600">No imported Jira issue currently matches a backfill tracking label.</div>
+              )}
+            </div>
+          </div>
         </section>
       </div>
     </AppShell>

@@ -61,3 +61,14 @@ The format loosely follows Keep a Changelog. Release detail pages match entries 
 
 ### Known issues
 - Enterprise absence-planning backlog remains modeled as unreleased future scope rather than live product behavior.
+
+## [Unreleased] - 2026-03-29 22:10 UTC
+
+### Added
+- Added a visible backfill lifecycle across dashboard, capabilities, traceability and automation pages.
+- Added detection logic that matches imported Jira issues back to deployed-without-Jira candidates via unique tracking labels.
+- Added clearer CSV export entry points so Jira backfill creation is reachable from the UI, not only implicit in the data model.
+
+### Changed
+- Jira backfill CSV now exports only unresolved deployed-without-Jira candidates.
+- Resolved backfill candidates are now shown separately once their tracking labels appear on imported Jira issues.
