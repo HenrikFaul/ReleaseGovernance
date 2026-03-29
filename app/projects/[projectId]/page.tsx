@@ -9,11 +9,21 @@ export default function ProjectDashboardPage({ params }: { params: { projectId: 
   const project = getProject(params.projectId);
   if (!project) return notFound();
 
-  const deployedReleases = project.releases.filter((release) => release.status !== "unreleased");
-  const unreleasedReleases = project.releases.filter((release) => release.status === "unreleased");
+  const deployedReleases = project.releases.filter((release) => (release.releaseState ?? "released") === "released");
+  const unreleasedReleases = project.releases.filter((release) => release.releaseState === "unreleased");
   const openAlerts = project.parityAlerts.filter((alert) => alert.state !== "resolved");
-  const currentRelease = project.releases.find((release) => release.status === "current") ?? deployedReleases[0];
+  const currentRelease =
+    project.releases.find((release) => release.status === "current")
+    ?? deployedReleases[0]
+    ?? project.releases[0];
+
   const impact = currentRelease ? evaluateReleaseImpact(currentRelease) : null;
+  const releasedCapabilities = project.capabilities.filter((capability) =>
+    Object.values(capability.firstRelease ?? {}).some((value) =>
+      deployedReleases.some((release) => release.version === value)
+    )
+  );
+  const backfillCount = project.backfillCandidates?.length ?? 0;
 
   return (
     <AppShell projectId={project.id} projectName={project.name}>
@@ -22,13 +32,18 @@ export default function ProjectDashboardPage({ params }: { params: { projectId: 
           eyebrow="Project dashboard"
           title={project.name}
           description="Unified governance view across product surfaces, shared backend, integrations and delivery documentation."
-          actions={<StatusBadge tone={project.deploymentStatus === "healthy" ? "success" : project.deploymentStatus === "warning" ? "warning" : "danger"}>{project.deploymentStatus}</StatusBadge>}
+          actions={
+            <StatusBadge tone={project.deploymentStatus === "healthy" ? "success" : project.deploymentStatus === "warning" ? "warning" : "danger"}>
+              {project.deploymentStatus}
+            </StatusBadge>
+          }
         />
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
           <StatCard label="Tracked releases" value={String(deployedReleases.length)} helper="Deployed release rows" />
           <StatCard label="Unreleased groups" value={String(unreleasedReleases.length)} helper="Specified but not yet deployed" />
-          <StatCard label="Capabilities" value={String(project.capabilities.length)} helper="Tracked independently from commits" />
+          <StatCard label="Released features" value={String(releasedCapabilities.length)} helper="Mapped to delivered releases" />
+          <StatCard label="Backfill candidates" value={String(backfillCount)} helper="Deployed without Jira" />
           <StatCard label="Open parity alerts" value={String(openAlerts.length)} helper="Cross-surface follow-up required" />
           <StatCard label="Connected integrations" value={String(project.integrations.length)} helper="Source systems and external APIs" />
         </div>
@@ -39,7 +54,7 @@ export default function ProjectDashboardPage({ params }: { params: { projectId: 
               <h3 className="text-lg font-semibold text-slate-900">Current release posture</h3>
               {currentRelease ? (
                 <StatusBadge tone={impact?.complianceStatus === "ready" ? "success" : impact?.complianceStatus === "needs-follow-up" ? "warning" : "danger"}>
-                  {currentRelease.status ?? "old"}
+                  {currentRelease.status ?? currentRelease.releaseState ?? "old"}
                 </StatusBadge>
               ) : null}
             </div>
@@ -50,7 +65,7 @@ export default function ProjectDashboardPage({ params }: { params: { projectId: 
                   <div className="mt-1 text-slate-500">{currentRelease.releaseNotes}</div>
                 </div>
                 <ul className="space-y-2">
-                  <li>Status: {currentRelease.status ?? "old"}</li>
+                  <li>Status: {currentRelease.status ?? currentRelease.releaseState ?? "old"}</li>
                   <li>Surfaces: {currentRelease.surfaces.join(", ")}</li>
                   <li>Backend changed: {String(currentRelease.backendChanged)}</li>
                   <li>Shared contract changed: {String(currentRelease.sharedContractChanged)}</li>

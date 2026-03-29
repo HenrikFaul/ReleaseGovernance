@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { SectionHeader, StatusBadge, SurfaceBadge } from "@/components/ui";
 import { evaluateReleaseImpact } from "@/lib/impact-engine";
+import { getChangelogEntry } from "@/lib/changelog";
 import { getProject } from "@/lib/mock-data";
 
 export default function ReleaseDetailPage({ params }: { params: { projectId: string; releaseId: string } }) {
@@ -10,6 +11,7 @@ export default function ReleaseDetailPage({ params }: { params: { projectId: str
   const release = project?.releases.find((item) => item.id === params.releaseId);
   if (!project || !release) return notFound();
   const impact = evaluateReleaseImpact(release);
+  const changelogEntry = getChangelogEntry(project.slug, release.version);
 
   const deliveredCapabilityRecords = release.deliveredCapabilities
     .map((capabilityId) => project.capabilities.find((capability) => capability.id === capabilityId))
@@ -21,7 +23,7 @@ export default function ReleaseDetailPage({ params }: { params: { projectId: str
         <SectionHeader
           eyebrow="Release detail"
           title={release.version}
-          description="Inspect delivered functionality, connected Jira work and cross-platform impact."
+          description="Inspect delivered functionality, connected Jira work, changelog context and cross-platform impact."
           actions={<StatusBadge tone={impact.complianceStatus === "ready" ? "success" : impact.complianceStatus === "needs-follow-up" ? "warning" : "danger"}>{impact.complianceStatus}</StatusBadge>}
         />
         <div className="flex items-center gap-3 text-sm">
@@ -36,7 +38,7 @@ export default function ReleaseDetailPage({ params }: { params: { projectId: str
             <div className="mt-4 space-y-4 text-sm text-slate-700">
               <div className="flex flex-wrap gap-2">{release.surfaces.map((surface) => <SurfaceBadge key={surface} surface={surface} />)}</div>
               <div>Release version: <span className="font-medium text-slate-900">{release.version}</span></div>
-              <div>Status: <span className="font-medium text-slate-900">{release.status ?? "old"}</span></div>
+              <div>Status: <span className="font-medium text-slate-900">{release.status ?? release.releaseState ?? "old"}</span></div>
               <div>Shipped at: {release.shippedAt}</div>
               <div>Backend changed: {String(release.backendChanged)}</div>
               <div>Shared contract changed: {String(release.sharedContractChanged)}</div>
@@ -87,6 +89,37 @@ export default function ReleaseDetailPage({ params }: { params: { projectId: str
             </div>
           </section>
         </div>
+
+        <section className="card p-6">
+          <h3 className="text-lg font-semibold text-slate-900">CHANGELOG.md entry</h3>
+          {changelogEntry ? (
+            <div className="mt-4 space-y-4">
+              <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                <div className="font-medium text-slate-900">{changelogEntry.title}</div>
+                {changelogEntry.date ? <div className="mt-1 text-slate-500">{changelogEntry.date}</div> : null}
+              </div>
+              {changelogEntry.sections.map((section) => (
+                <div key={section.heading} className="rounded-2xl border border-slate-200 p-4">
+                  <div className="font-medium text-slate-900">{section.heading}</div>
+                  {section.prose.length ? (
+                    <div className="mt-2 space-y-2 text-sm text-slate-600">
+                      {section.prose.map((line) => <p key={line}>{line}</p>)}
+                    </div>
+                  ) : null}
+                  {section.bullets.length ? (
+                    <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-slate-600">
+                      {section.bullets.map((bullet) => <li key={bullet}>{bullet}</li>)}
+                    </ul>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-4 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+              No matching CHANGELOG.md entry was found for this release. The fallback release notes remain the seeded summary above.
+            </div>
+          )}
+        </section>
       </div>
     </AppShell>
   );
