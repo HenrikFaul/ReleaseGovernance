@@ -1,30 +1,12 @@
-
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
-import { applyImportBundle } from "@/lib/project-overrides";
+import { addReleaseCandidate, applyImportBundle, approveReleaseCandidate, readProjectSettings, writeProjectSettings } from "@/lib/project-overrides";
 import { CANONICAL_COLUMNS, createTemplateWorkbook, parseImportFile, templateCsv, templateMarkdown } from "@/lib/import-utils";
-import { ImportedJiraIssue, ProjectImportBundle } from "@/lib/types";
+import { ProjectImportBundle, ProjectIntegrationSettings, ReleaseCandidate } from "@/lib/types";
+import { getProject } from "@/lib/mock-data";
 import { useProjectRecord } from "@/hooks/useProjectRecord";
-
-const SETTINGS_PREFIX = "releasegovernance.jiraSettings.";
-
-type JiraSettings = {
-  jiraUrl: string;
-  jiraEmail: string;
-  jiraToken: string;
-  maxResults: string;
-  allResults: boolean;
-};
-
-const DEFAULT_SETTINGS: JiraSettings = {
-  jiraUrl: "",
-  jiraEmail: "",
-  jiraToken: "",
-  maxResults: "10",
-  allResults: false,
-};
 
 function download(filename: string, content: BlobPart, type: string) {
   const blob = new Blob([content], { type });
@@ -36,12 +18,6 @@ function download(filename: string, content: BlobPart, type: string) {
   URL.revokeObjectURL(url);
 }
 
-function normalizeTestCount(value: string) {
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) return 10;
-  return Math.min(parsed, 500);
-}
-
 function formatDate(value?: string) {
   if (!value) return "—";
   const date = new Date(value);
@@ -49,46 +25,49 @@ function formatDate(value?: string) {
   return date.toISOString().slice(0, 10);
 }
 
+function projectDefaults(projectId: string) {
+  if (projectId === "project_hobbeast") return { projectKey: "HOB" };
+  if (projectId === "project_syncfolk") return { projectKey: "SYN" };
+  return { projectKey: "RLG" };
+}
+
+function checkTone(present: boolean) {
+  return present ? "bg-emerald-50 border-emerald-200 text-emerald-800" : "bg-slate-50 border-slate-200 text-slate-600";
+}
+
 export function ImportStudio({ projectId }: { projectId: string }) {
-  const { project } = useProjectRecord(projectId);
-  const projectKey = project?.jiraProjectKey ?? "";
+  const project = getProject(projectId);
+  const { project: mergedProject, refresh } = useProjectRecord(projectId);
   const [bundle, setBundle] = useState<ProjectImportBundle | null>(null);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
+  const defaults = projectDefaults(projectId);
+
   const [jiraUrl, setJiraUrl] = useState("");
   const [jiraEmail, setJiraEmail] = useState("");
   const [jiraToken, setJiraToken] = useState("");
-  const [maxResults, setMaxResults] = useState(DEFAULT_SETTINGS.maxResults);
-  const [allResults, setAllResults] = useState(DEFAULT_SETTINGS.allResults);
-  const [testIssues, setTestIssues] = useState<ImportedJiraIssue[]>([]);
-  const [isSaving, setIsSaving] = useState(false);
-  const [isTesting, setIsTesting] = useState(false);
-  const [isImportingJira, setIsImportingJira] = useState(false);
+  const [jiraPreviewLimit, setJiraPreviewLimit] = useState(10);
+  const [jiraQueryAll, setJiraQueryAll] = useState(false);
+
+  const [repoUrl, setRepoUrl] = useState("");
+  const [githubToken, setGithubToken] = useState("");
+  const [hostingProvider, setHostingProvider] = useState<"vercel" | "supabase" | "custom">("vercel");
+  const [hostingUrl, setHostingUrl] = useState("");
+  const [hostingApiKey, setHostingApiKey] = useState("");
+  const [previewIssues, setPreviewIssues] = useState<any[]>([]);
 
   useEffect(() => {
-    const raw = window.localStorage.getItem(`${SETTINGS_PREFIX}${projectId}`);
-    if (!raw) {
-      setJiraUrl("");
-      setJiraEmail("");
-      setJiraToken("");
-      setMaxResults(DEFAULT_SETTINGS.maxResults);
-      setAllResults(DEFAULT_SETTINGS.allResults);
-      return;
-    }
-    try {
-      const parsed = JSON.parse(raw) as Partial<JiraSettings>;
-      setJiraUrl(parsed.jiraUrl ?? "");
-      setJiraEmail(parsed.jiraEmail ?? "");
-      setJiraToken(parsed.jiraToken ?? "");
-      setMaxResults(parsed.maxResults ?? DEFAULT_SETTINGS.maxResults);
-      setAllResults(Boolean(parsed.allResults));
-    } catch {
-      setJiraUrl("");
-      setJiraEmail("");
-      setJiraToken("");
-      setMaxResults(DEFAULT_SETTINGS.maxResults);
-      setAllResults(DEFAULT_SETTINGS.allResults);
-    }
+    const settings = readProjectSettings(projectId);
+    setJiraUrl(settings.jiraUrl ?? "");
+    setJiraEmail(settings.jiraEmail ?? "");
+    setJiraToken(settings.jiraToken ?? "");
+    setJiraPreviewLimit(settings.jiraPreviewLimit ?? 10);
+    setJiraQueryAll(settings.jiraQueryAll ?? false);
+    setRepoUrl(settings.repoUrl ?? project?.repositories.web ?? project?.repositories.android ?? "");
+    setGithubToken(settings.githubToken ?? "");
+    setHostingProvider(settings.hostingProvider ?? "vercel");
+    setHostingUrl(settings.hostingUrl ?? (project?.domain ? `https://${project.domain}` : ""));
+    setHostingApiKey(settings.hostingApiKey ?? "");
   }, [projectId]);
 
   const summary = useMemo(() => {
@@ -98,7 +77,7 @@ export function ImportStudio({ projectId }: { projectId: string }) {
       unreleased: bundle.releases.filter((item) => item.releaseState === "unreleased").length,
       capabilities: bundle.capabilities.length,
       integrations: bundle.integrations.length,
-      jira: bundle.importedJiraIssues.length
+      jira: bundle.importedJiraIssues.length,
     };
   }, [bundle]);
 
@@ -114,101 +93,82 @@ export function ImportStudio({ projectId }: { projectId: string }) {
     }
   }
 
-  function saveJiraSettings() {
+  function saveSettings() {
+    const settings: ProjectIntegrationSettings = {
+      jiraUrl,
+      jiraEmail,
+      jiraToken,
+      jiraPreviewLimit,
+      jiraQueryAll,
+      repoUrl,
+      githubToken,
+      hostingProvider,
+      hostingUrl,
+      hostingApiKey,
+    };
+    writeProjectSettings(projectId, settings);
+    setStatus("Project-scoped Jira / GitHub / hosting settings saved.");
     setError("");
-    setStatus("");
-    if (!projectKey) {
-      setError("This project does not have a Jira project key configured, so Jira settings cannot be saved yet.");
-      return;
-    }
-    setIsSaving(true);
-    try {
-      window.localStorage.setItem(`${SETTINGS_PREFIX}${projectId}`, JSON.stringify({
-        jiraUrl,
-        jiraEmail,
-        jiraToken,
-        maxResults,
-        allResults,
-      } satisfies JiraSettings));
-      setStatus(`Saved Jira settings locally for project ${projectKey}.`);
-    } finally {
-      setIsSaving(false);
-    }
   }
 
-  async function onJiraTest() {
+  async function onJiraImport(testOnly: boolean) {
     setError("");
     setStatus("");
-    setTestIssues([]);
-    if (!projectKey) {
-      setError("Selected project has no Jira project key configured. Set the project Jira key first.");
-      return;
-    }
-    if (!jiraEmail || !jiraToken) {
-      setError("Jira account email and Jira API token are required for test queries.");
-      return;
-    }
-    setIsTesting(true);
     try {
       const res = await fetch("/api/jira/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jiraUrl,
-          email: jiraEmail,
-          apiToken: jiraToken,
-          projectKey,
-          mode: "test",
-          maxResults: allResults ? "all" : normalizeTestCount(maxResults),
-        })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Jira test failed.");
-      setTestIssues(data.issues ?? []);
-      setStatus(`Fetched ${data.issues?.length ?? 0} Jira issue(s) for project ${projectKey}.`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Jira test failed.");
-    } finally {
-      setIsTesting(false);
-    }
-  }
-
-  async function onJiraImport() {
-    setError("");
-    setStatus("");
-    if (!projectKey) {
-      setError("Selected project has no Jira project key configured. Set the project Jira key first.");
-      return;
-    }
-    try {
-      setIsImportingJira(true);
-      const res = await fetch("/api/jira/import", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jiraUrl, email: jiraEmail, apiToken: jiraToken, projectKey, mode: "import" })
+        body: JSON.stringify({ jiraUrl, email: jiraEmail, apiToken: jiraToken, projectKey: defaults.projectKey, maxResults: jiraPreviewLimit, queryAll: jiraQueryAll })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Jira import failed.");
-      const importedIssues: ImportedJiraIssue[] = data.issues ?? [];
+      setPreviewIssues(data.issues ?? []);
+      if (testOnly) {
+        setStatus(`Previewed ${data.issues?.length ?? 0} Jira issue(s) for ${defaults.projectKey}.`);
+        return;
+      }
       setBundle((current) => ({
         releases: current?.releases ?? [],
         capabilities: current?.capabilities ?? [],
         integrations: current?.integrations ?? [],
-        importedJiraIssues: importedIssues
+        importedJiraIssues: [...(current?.importedJiraIssues ?? []), ...(data.issues ?? [])],
       }));
-      setTestIssues(importedIssues.slice(0, allResults ? importedIssues.length : normalizeTestCount(maxResults)));
-      setStatus(`Imported ${importedIssues.length} Jira issue(s) from project ${projectKey}. These will also appear in Capabilities as imported Jira capability candidates.`);
+      setStatus(`Imported ${data.issues?.length ?? 0} Jira issue(s). These will also appear in Capabilities as imported Jira capability candidates.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Jira import failed.");
-    } finally {
-      setIsImportingJira(false);
+    }
+  }
+
+  async function detectReleaseCandidate() {
+    setError("");
+    setStatus("");
+    try {
+      const res = await fetch("/api/release-detection", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId, projectSlug: project?.slug ?? projectId, projectKey: defaults.projectKey, repoUrl, githubToken, hostingProvider, hostingUrl, hostingApiKey })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Release detection failed.");
+      addReleaseCandidate(projectId, data.candidate as ReleaseCandidate);
+      refresh();
+      setStatus(`Fetched latest release candidate ${data.candidate.version}. Review required checks and approve when ready.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Release detection failed.");
     }
   }
 
   function apply() {
     if (!bundle) return;
     applyImportBundle(projectId, bundle);
-    setStatus("Imported data applied to this project. Refresh or navigate to see updates.");
+    refresh();
+    setStatus("Imported data applied to this project.");
+  }
+
+  function approve(candidateId: string) {
+    approveReleaseCandidate(projectId, candidateId);
+    refresh();
+    setStatus("Release candidate approved and routed to the correct governance destination.");
   }
 
   function downloadXlsx() {
@@ -221,116 +181,78 @@ export function ImportStudio({ projectId }: { projectId: string }) {
     <div className="space-y-6">
       <section className="card p-6">
         <h3 className="text-lg font-semibold text-slate-900">File import</h3>
-        <p className="mt-2 text-sm text-slate-600">
-          Import Markdown, CSV or Excel. All three formats use the same canonical information model. Markdown uses tables; CSV and Excel use the same canonical columns and the <code>record_type</code> field.
-        </p>
-        <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-xs text-slate-600">
-          Canonical fields: {CANONICAL_COLUMNS.join(", ")}
-        </div>
+        <p className="mt-2 text-sm text-slate-600">Import Markdown, CSV or Excel. All three formats use the same canonical information model. Markdown uses tables; CSV and Excel use the same canonical columns and the <code>record_type</code> field.</p>
+        <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-xs text-slate-600">Canonical fields: {CANONICAL_COLUMNS.join(", ")}</div>
         <div className="mt-4 flex flex-wrap gap-3">
-          <label className="cursor-pointer rounded-2xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
-            Upload .md / .csv / .xlsx
-            <input type="file" className="hidden" accept=".md,.markdown,.csv,.xlsx,.xls" onChange={(e) => { const file = e.target.files?.[0]; if (file) void onFile(file); }} />
-          </label>
+          <label className="cursor-pointer rounded-2xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Upload .md / .csv / .xlsx<input type="file" className="hidden" accept=".md,.markdown,.csv,.xlsx,.xls" onChange={(e) => { const file = e.target.files?.[0]; if (file) void onFile(file); }} /></label>
           <button onClick={() => download("releasegovernance-import-template.md", templateMarkdown, "text/markdown")} className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Download MD template</button>
           <button onClick={() => download("releasegovernance-import-template.csv", templateCsv(), "text/csv")} className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Download CSV template</button>
           <button onClick={downloadXlsx} className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Download Excel template</button>
         </div>
       </section>
 
-      <section className="card p-6">
-        <h3 className="text-lg font-semibold text-slate-900">Jira URL import</h3>
-        <p className="mt-2 text-sm text-slate-600">
-          Import Jira work by giving an issue URL, an issues page URL with JQL, or a Jira project URL such as <code>/jira/software/projects/KEY</code>. Settings are stored locally per governed project when you press save.
-        </p>
-        <div className="mt-4 grid gap-3 md:grid-cols-2">
-          <input value={jiraUrl} onChange={(e) => setJiraUrl(e.target.value)} placeholder="https://example.atlassian.net/jira/software/projects/APP or /browse/APP-101 or /issues?jql=..." className="rounded-2xl border border-slate-200 px-4 py-3 text-sm" />
-          <div className="rounded-2xl border border-slate-200 px-4 py-3 text-sm bg-slate-50 text-slate-700">
-            Project filter: <span className="font-semibold">{projectKey || "not configured"}</span>
+      <section className="card p-6 space-y-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h3 className="text-lg font-semibold text-slate-900">Jira + release detection settings</h3>
+            <p className="mt-2 text-sm text-slate-600">All credentials are stored per project. Jira queries are forced to {defaults.projectKey}. Release detection reads the latest GitHub commit, hosting status and optional CHANGELOG entry.</p>
           </div>
-          <input value={jiraEmail} onChange={(e) => setJiraEmail(e.target.value)} placeholder="Jira account email" className="rounded-2xl border border-slate-200 px-4 py-3 text-sm" />
-          <input value={jiraToken} type="password" onChange={(e) => setJiraToken(e.target.value)} placeholder="Jira API token" className="rounded-2xl border border-slate-200 px-4 py-3 text-sm" />
-          <div className="rounded-2xl border border-slate-200 px-4 py-3 text-sm">
-            <label className="flex items-center justify-between gap-3">
-              <span className="text-slate-700">Max Jira rows to preview</span>
-              <input
-                value={maxResults}
-                onChange={(e) => setMaxResults(e.target.value)}
-                disabled={allResults}
-                inputMode="numeric"
-                className="w-24 rounded-xl border border-slate-200 px-3 py-2 text-right text-sm"
-              />
-            </label>
-            <label className="mt-3 flex items-center gap-2 text-slate-700">
-              <input type="checkbox" checked={allResults} onChange={(e) => setAllResults(e.target.checked)} />
-              Query all available project issues
-            </label>
-          </div>
-          <div className="rounded-2xl border border-slate-200 px-4 py-3 text-sm bg-slate-50 text-slate-600">
-            Default test fields: Jira key, summary, status, type, created, parent. Project filter is always enforced to the selected project.
-          </div>
+          <button onClick={saveSettings} className="rounded-2xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">Save settings</button>
         </div>
-        <div className="mt-4 flex flex-wrap gap-3">
-          <button onClick={saveJiraSettings} disabled={isSaving} className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60">{isSaving ? "Saving..." : "Save Jira settings"}</button>
-          <button onClick={onJiraTest} disabled={isTesting} className="rounded-2xl border border-brand-200 px-4 py-2 text-sm font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-60">{isTesting ? "Testing..." : "Test Jira query"}</button>
-          <button onClick={onJiraImport} disabled={isImportingJira} className="rounded-2xl bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60">{isImportingJira ? "Importing..." : "Import from Jira"}</button>
+        <div className="grid gap-3 md:grid-cols-2">
+          <input value={jiraUrl} onChange={(e) => setJiraUrl(e.target.value)} placeholder={`https://example.atlassian.net/jira/software/projects/${defaults.projectKey}`} className="rounded-2xl border border-slate-200 px-4 py-3 text-sm" />
+          <input value={jiraEmail} onChange={(e) => setJiraEmail(e.target.value)} placeholder="Jira account email" className="rounded-2xl border border-slate-200 px-4 py-3 text-sm" />
+          <input value={jiraToken} type="password" onChange={(e) => setJiraToken(e.target.value)} placeholder="Jira API token" className="rounded-2xl border border-slate-200 px-4 py-3 text-sm md:col-span-2" />
+          <input value={repoUrl} onChange={(e) => setRepoUrl(e.target.value)} placeholder="https://github.com/owner/repo or owner/repo" className="rounded-2xl border border-slate-200 px-4 py-3 text-sm" />
+          <input value={githubToken} type="password" onChange={(e) => setGithubToken(e.target.value)} placeholder="GitHub API token" className="rounded-2xl border border-slate-200 px-4 py-3 text-sm" />
+          <select value={hostingProvider} onChange={(e) => setHostingProvider(e.target.value as any)} className="rounded-2xl border border-slate-200 px-4 py-3 text-sm"><option value="vercel">Vercel</option><option value="supabase">Supabase</option><option value="custom">Custom</option></select>
+          <input value={hostingUrl} onChange={(e) => setHostingUrl(e.target.value)} placeholder="https://your-hosting-endpoint" className="rounded-2xl border border-slate-200 px-4 py-3 text-sm" />
+          <input value={hostingApiKey} type="password" onChange={(e) => setHostingApiKey(e.target.value)} placeholder="Hosting API key" className="rounded-2xl border border-slate-200 px-4 py-3 text-sm md:col-span-2" />
+        </div>
+        <div className="grid gap-3 md:grid-cols-[1fr,160px,220px]">
+          <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-3 text-sm text-slate-600">Project filter enforced: <span className="font-semibold text-slate-900">project = {defaults.projectKey}</span></div>
+          <input type="number" min={1} max={100} value={jiraPreviewLimit} onChange={(e) => setJiraPreviewLimit(Number(e.target.value) || 10)} className="rounded-2xl border border-slate-200 px-4 py-3 text-sm" />
+          <label className="flex items-center gap-3 rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-700"><input type="checkbox" checked={jiraQueryAll} onChange={(e) => setJiraQueryAll(e.target.checked)} /> Query all available project issues</label>
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <button onClick={() => onJiraImport(true)} className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Test Jira query</button>
+          <button onClick={() => onJiraImport(false)} className="rounded-2xl bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">Import from Jira</button>
+          <button onClick={detectReleaseCandidate} className="rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700">Fetch latest release candidate</button>
         </div>
       </section>
 
-      {error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{error}</div> : null}
-      {status ? <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">{status}</div> : null}
-
-      {testIssues.length ? (
+      {previewIssues.length ? (
         <section className="card p-6">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h3 className="text-lg font-semibold text-slate-900">Jira test preview</h3>
-              <p className="mt-2 text-sm text-slate-600">Preview rows from the enforced Jira project filter before importing.</p>
-            </div>
-            <div className="text-sm text-slate-500">{testIssues.length} row(s)</div>
-          </div>
-          <div className="mt-4 overflow-x-auto">
-            <table className="min-w-full border-collapse text-left text-sm">
-              <thead>
-                <tr className="border-b border-slate-200 text-slate-500">
-                  <th className="px-3 py-2 font-medium">Jira key</th>
-                  <th className="px-3 py-2 font-medium">Summary</th>
-                  <th className="px-3 py-2 font-medium">Status</th>
-                  <th className="px-3 py-2 font-medium">Type</th>
-                  <th className="px-3 py-2 font-medium">Created</th>
-                  <th className="px-3 py-2 font-medium">Parent</th>
-                </tr>
-              </thead>
-              <tbody>
-                {testIssues.map((issue) => (
-                  <tr key={issue.key} className="border-b border-slate-100 align-top">
-                    <td className="px-3 py-3"><a href={issue.url} className="font-medium text-brand-700 hover:underline">{issue.key}</a></td>
-                    <td className="px-3 py-3 text-slate-900">{issue.summary}</td>
-                    <td className="px-3 py-3 text-slate-700">{issue.status ?? "—"}</td>
-                    <td className="px-3 py-3 text-slate-700">{issue.issueType ?? "—"}</td>
-                    <td className="px-3 py-3 text-slate-700">{formatDate(issue.created)}</td>
-                    <td className="px-3 py-3 text-slate-700">{issue.parentKey ?? "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <h3 className="text-lg font-semibold text-slate-900">Jira preview</h3>
+          <div className="mt-4 overflow-x-auto"><table className="min-w-full border-collapse text-left text-sm"><thead><tr className="border-b border-slate-200 text-slate-500"><th className="px-3 py-2 font-medium">Key</th><th className="px-3 py-2 font-medium">Summary</th><th className="px-3 py-2 font-medium">Status</th><th className="px-3 py-2 font-medium">Type</th><th className="px-3 py-2 font-medium">Created</th><th className="px-3 py-2 font-medium">Parent</th></tr></thead><tbody>{previewIssues.map((issue) => (<tr key={issue.key} className="border-b border-slate-100 align-top"><td className="px-3 py-3"><a href={issue.url} className="font-medium text-brand-700 hover:underline">{issue.key}</a></td><td className="px-3 py-3 text-slate-900">{issue.summary}</td><td className="px-3 py-3 text-slate-700">{issue.status ?? "—"}</td><td className="px-3 py-3 text-slate-700">{issue.issueType ?? "—"}</td><td className="px-3 py-3 text-slate-700">{formatDate(issue.created)}</td><td className="px-3 py-3 text-slate-700">{issue.parentKey ?? "—"}</td></tr>))}</tbody></table></div>
+        </section>
+      ) : null}
+
+      {mergedProject?.releaseCandidates?.length ? (
+        <section className="card p-6">
+          <h3 className="text-lg font-semibold text-slate-900">Detected release candidates</h3>
+          <p className="mt-2 text-sm text-slate-600">Green rows contain the required field value. Approving moves the candidate either to Releases or to Jira CSV backfill, depending on whether Jira keys were detected.</p>
+          <div className="mt-4 space-y-4">
+            {mergedProject.releaseCandidates.map((candidate) => (
+              <div key={candidate.id} className="rounded-2xl border border-slate-200 p-5">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="flex items-start gap-3"><button onClick={() => approve(candidate.id)} className="rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700">Jóváhagy</button><div><div className="text-lg font-semibold text-slate-900">{candidate.version}</div><div className="mt-1 text-sm text-slate-600">{candidate.releaseNotes}</div><div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">{candidate.surfaces.map((surface) => <span key={surface} className="badge badge-info">{surface}</span>)}<span className="badge badge-neutral">{candidate.hostingProvider}</span>{candidate.jiraKeys.length ? <span className="badge badge-neutral">Jira: {candidate.jiraKeys.join(", ")}</span> : <span className="badge badge-warning">No Jira detected</span>}</div></div></div><div className="text-sm text-slate-500">Detected {formatDate(candidate.detectedAt)}</div>
+                </div>
+                <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">{candidate.requiredChecks.map((check) => (<div key={check.key} className={`rounded-2xl border px-4 py-3 text-sm ${checkTone(check.present)}`}><div className="font-medium">{check.label}</div><div className="mt-1 break-all text-xs">{check.value ?? "missing"}</div></div>))}</div>
+                {(candidate.commitMessage || candidate.changelog) ? <div className="mt-4 grid gap-4 xl:grid-cols-2"><div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700"><div className="font-medium text-slate-900">Commit comment</div><div className="mt-2">{candidate.commitMessage ?? "—"}</div>{candidate.commitUrl ? <a href={candidate.commitUrl} className="mt-2 inline-block text-brand-700 hover:underline">Open commit</a> : null}</div><div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700"><div className="font-medium text-slate-900">Latest CHANGELOG entry</div><div className="mt-2">{candidate.changelog?.title ?? "No project-scoped changelog entry detected."}</div></div></div> : null}
+              </div>
+            ))}
           </div>
         </section>
       ) : null}
 
+      {error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{error}</div> : null}
+      {status ? <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">{status}</div> : null}
+
       {summary ? (
         <section className="card p-6">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-slate-900">Import preview</h3>
-            <button onClick={apply} className="rounded-2xl bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">Apply import to project</button>
-          </div>
-          <div className="mt-4 grid gap-4 md:grid-cols-5">
-            <div className="rounded-2xl bg-slate-50 p-4 text-sm"><div className="text-slate-500">Releases</div><div className="mt-1 text-xl font-semibold text-slate-900">{summary.releases}</div></div>
-            <div className="rounded-2xl bg-slate-50 p-4 text-sm"><div className="text-slate-500">Unreleased</div><div className="mt-1 text-xl font-semibold text-slate-900">{summary.unreleased}</div></div>
-            <div className="rounded-2xl bg-slate-50 p-4 text-sm"><div className="text-slate-500">Capabilities</div><div className="mt-1 text-xl font-semibold text-slate-900">{summary.capabilities}</div></div>
-            <div className="rounded-2xl bg-slate-50 p-4 text-sm"><div className="text-slate-500">Integrations</div><div className="mt-1 text-xl font-semibold text-slate-900">{summary.integrations}</div></div>
-            <div className="rounded-2xl bg-slate-50 p-4 text-sm"><div className="text-slate-500">Jira items</div><div className="mt-1 text-xl font-semibold text-slate-900">{summary.jira}</div></div>
-          </div>
+          <div className="flex items-center justify-between"><h3 className="text-lg font-semibold text-slate-900">Import preview</h3><button onClick={apply} className="rounded-2xl bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">Apply import to project</button></div>
+          <div className="mt-4 grid gap-4 md:grid-cols-5"><div className="rounded-2xl bg-slate-50 p-4 text-sm"><div className="text-slate-500">Releases</div><div className="mt-1 text-xl font-semibold text-slate-900">{summary.releases}</div></div><div className="rounded-2xl bg-slate-50 p-4 text-sm"><div className="text-slate-500">Unreleased</div><div className="mt-1 text-xl font-semibold text-slate-900">{summary.unreleased}</div></div><div className="rounded-2xl bg-slate-50 p-4 text-sm"><div className="text-slate-500">Capabilities</div><div className="mt-1 text-xl font-semibold text-slate-900">{summary.capabilities}</div></div><div className="rounded-2xl bg-slate-50 p-4 text-sm"><div className="text-slate-500">Integrations</div><div className="mt-1 text-xl font-semibold text-slate-900">{summary.integrations}</div></div><div className="rounded-2xl bg-slate-50 p-4 text-sm"><div className="text-slate-500">Jira items</div><div className="mt-1 text-xl font-semibold text-slate-900">{summary.jira}</div></div></div>
         </section>
       ) : null}
     </div>

@@ -9,16 +9,23 @@ Kötelező szerkezet minden új bejegyzésnél:
 - Megelőzés
 - Ellenőrzés
 
-### [023] UI preview mezők és a shared import típus szétcsúszása
-- **Tünet / log:** `Property 'status' does not exist on type 'ImportedJiraIssue'.` hiba az `components/import-studio.tsx` fájlban, ugyanígy érintheti az `issueType`, `created`, `parentKey` mezőket is.
-- **Kiváltó ok:** a Jira test/import preview táblához új mezők kerültek be a UI-ba és/vagy API válaszba, de a közös `ImportedJiraIssue` interfész nem lett velük együtt bővítve.
-- **Javítás:** a shared típusrétegben (`lib/types.ts`) az `ImportedJiraIssue`-hoz hozzá kell adni az opcionális preview mezőket: `status`, `issueType`, `created`, `parentKey`.
-- **Megelőzés:** minden import-/preview-feature patchnél együtt kell kezelni a hármast: API route -> shared type -> UI consumer. Egyik sem változhat külön a másik kettő nélkül.
-- **Ellenőrzés:** keresd végig a repo-t `ImportedJiraIssue` használatokra és nézd meg, hogy a renderelt mezők mind szerepelnek-e az interfészben, mielőtt buildet indítasz.
+### [025] Local override state must be used on project pages that need to reflect approvals
+- **Tünet / log:** approved releases or backfill candidates would not appear on pages that still rendered only seeded mock data.
+- **Kiváltó ok:** server/static pages used `getProject(...)` directly and ignored local override state written by import/approval workflows.
+- **Javítás:** pages that need to reflect approvals must read merged state through `useProjectRecord(...)`, which combines base project data with local overrides.
+- **Megelőzés:** every new workflow that writes project-local approval/import state must check all consumer pages and make sure they render merged state, not only the static seed.
+- **Ellenőrzés:** approve a release candidate and verify it appears on Dashboard, Releases, Release detail, Traceability, Automation and Capabilities without manually editing `mock-data.ts`.
 
-### [024] Ismétlődő shared-type regressziók
-- **Tünet / log:** sorozatban jelentkeztek hibák, ahol a UI már használt közös domain mezőket, de a shared type layer nem tartotta velük a lépést (`ProjectImportBundle`, `backfillCandidates`, `ImportedJiraIssue.status`).
-- **Kiváltó ok:** feature javítások során a shared contract ellenőrzés kimaradt.
-- **Javítás:** minden patch végén legyen kötelező shared-contract audit a módosított domain objektumokra.
-- **Megelőzés:** patch checklistbe vedd fel: "módosult-e shared interface?" és "minden consumer ugyanazt a canonical típust használja-e?".
-- **Ellenőrzés:** build előtt külön nézd át a `lib/types.ts`-t azokhoz az objektumokhoz, amelyek körül az adott hibajegy/patch mozgott.
+### [026] Feature detection pipelines need a staging step before they touch official release rows
+- **Tünet / log:** if fetched GitHub/hosting data goes straight to Releases, there is no human checkpoint and incomplete metadata can pollute the governance registry.
+- **Kiváltó ok:** missing candidate layer between raw external data and approved governance rows.
+- **Javítás:** create a release-candidate stage with explicit required-check fields and a `Jóváhagy` action that routes the row either to Releases or Jira CSV backfill.
+- **Megelőzés:** any external ingestion (GitHub, hosting, deployment provider) must land in a reviewable candidate state first.
+- **Ellenőrzés:** fetched release candidates must show required checks, green-filled fields and approval routing to the correct destination.
+
+### [027] External repo + hosting credentials are project-scoped settings, not global app state
+- **Tünet / log:** without per-project persistence, Hobbeast credentials can overwrite Syncfolk or ReleaseGovernance credentials.
+- **Kiváltó ok:** using a single global form state for multi-project integrations.
+- **Javítás:** persist GitHub/hosting settings under a project-specific storage key and restore them when returning to the project.
+- **Megelőzés:** all external integration settings in ReleaseGovernance must be namespaced by `projectId`.
+- **Ellenőrzés:** save different GitHub/hosting settings for HOB, SYN and RLG, refresh, and verify each project restores its own values.

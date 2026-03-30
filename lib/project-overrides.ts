@@ -1,9 +1,10 @@
 "use client";
 
 import { getProject } from "@/lib/mock-data";
-import { CapabilityRecord, ImportedJiraIssue, ProjectImportBundle, ProjectOverride, ProjectRecord, Surface } from "@/lib/types";
+import { BackfillCandidate, CapabilityRecord, ImportedJiraIssue, ProjectImportBundle, ProjectIntegrationSettings, ProjectOverride, ProjectRecord, ReleaseCandidate, ReleaseItem, Surface } from "@/lib/types";
 
 const STORAGE_PREFIX = "releasegovernance.projectOverride.";
+const SETTINGS_PREFIX = "releasegovernance.integrationSettings.";
 
 const dedupe = <T extends { id?: string }>(items: T[]) => {
   const seen = new Set<string>();
@@ -21,6 +22,24 @@ const dedupeJira = (items: ImportedJiraIssue[]) => {
     const id = item.key || item.id;
     if (seen.has(id)) return false;
     seen.add(id);
+    return true;
+  });
+};
+
+const dedupeBackfill = (items: BackfillCandidate[]) => {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    if (seen.has(item.id)) return false;
+    seen.add(item.id);
+    return true;
+  });
+};
+
+const dedupeCandidates = (items: ReleaseCandidate[]) => {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    if (seen.has(item.id)) return false;
+    seen.add(item.id);
     return true;
   });
 };
@@ -95,13 +114,108 @@ export function writeProjectOverride(projectId: string, override: ProjectOverrid
   localStorage.setItem(`${STORAGE_PREFIX}${projectId}`, JSON.stringify(override));
 }
 
+export function readProjectSettings(projectId: string): ProjectIntegrationSettings {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = localStorage.getItem(`${SETTINGS_PREFIX}${projectId}`);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+export function writeProjectSettings(projectId: string, settings: ProjectIntegrationSettings) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(`${SETTINGS_PREFIX}${projectId}`, JSON.stringify(settings));
+}
+
 export function applyImportBundle(projectId: string, bundle: ProjectImportBundle) {
   const current = readProjectOverride(projectId);
   writeProjectOverride(projectId, {
+    ...current,
     releases: dedupe([...(current.releases ?? []), ...bundle.releases]),
     capabilities: dedupe([...(current.capabilities ?? []), ...bundle.capabilities]),
     integrations: dedupe([...(current.integrations ?? []), ...bundle.integrations]),
-    importedJiraIssues: dedupeJira([...(current.importedJiraIssues ?? []), ...bundle.importedJiraIssues])
+    importedJiraIssues: dedupeJira([...(current.importedJiraIssues ?? []), ...bundle.importedJiraIssues]),
+    backfillCandidates: dedupeBackfill(current.backfillCandidates ?? []),
+    releaseCandidates: dedupeCandidates(current.releaseCandidates ?? []),
+  });
+}
+
+export function addReleaseCandidate(projectId: string, candidate: ReleaseCandidate) {
+  const current = readProjectOverride(projectId);
+  writeProjectOverride(projectId, {
+    ...current,
+    releaseCandidates: dedupeCandidates([candidate, ...(current.releaseCandidates ?? [])]),
+  });
+}
+
+export function approveReleaseCandidate(projectId: string, candidateId: string) {
+  const current = readProjectOverride(projectId);
+  const base = getProject(projectId);
+  const mergedCandidates = dedupeCandidates([...(base?.releaseCandidates ?? []), ...(current.releaseCandidates ?? [])]);
+  const candidate = mergedCandidates.find((item) => item.id === candidateId);
+  if (!candidate) return;
+  const remaining = (current.releaseCandidates ?? []).filter((item) => item.id !== candidateId);
+
+  if (candidate.jiraKeys.length) {
+    const imported = dedupeJira([...(base?.importedJiraIssues ?? []), ...(current.importedJiraIssues ?? [])]);
+    const jiraLinks = candidate.jiraKeys.map((key) => {
+      const linked = imported.find((issue) => issue.key === key);
+      return {
+        key,
+        summary: linked?.summary ?? key,
+        status: linked?.status ?? "Imported",
+        url: linked?.url ?? "#",
+        description: linked?.description,
+        labels: linked?.labels,
+      };
+    });
+    const release: ReleaseItem = {
+      id: `rel_${candidate.id}`,
+      version: candidate.version,
+      status: "current",
+      releaseState: "released",
+      surfaces: candidate.surfaces,
+      shippedAt: candidate.detectedAt.slice(0, 10),
+      backendChanged: candidate.backendChanged,
+      sharedContractChanged: candidate.sharedContractChanged,
+      schemaChanged: candidate.schemaChanged,
+      integrationsChanged: candidate.integrationsChanged,
+      jiraBackfillRequired: false,
+      deliveredCapabilities: [],
+      releaseNotes: candidate.releaseNotes,
+      jiraLinks,
+      source: candidate.source,
+      deploymentComment: candidate.hostingSummary,
+      commitMessage: candidate.commitMessage,
+      commitUrl: candidate.commitUrl,
+      changelog: candidate.changelog,
+    };
+    writeProjectOverride(projectId, {
+      ...current,
+      releaseCandidates: remaining,
+      releases: dedupe([release, ...(current.releases ?? [])]),
+    });
+    return;
+  }
+
+  const labels = [`rg-backfill:${candidate.id}`, `rg-project:${projectId}`];
+  const backfill: BackfillCandidate = {
+    id: `backfill_${candidate.id}`,
+    featureName: candidate.version,
+    summary: `Backfill Jira story for ${candidate.version}`,
+    description: [candidate.releaseNotes, candidate.commitMessage ? `Commit: ${candidate.commitMessage}` : "", candidate.changelog?.title ? `CHANGELOG: ${candidate.changelog.title}` : ""].filter(Boolean).join("\n\n"),
+    parent: base?.jiraProjectKey ? `${base.jiraProjectKey}-1` : "PROJECT-PARENT",
+    labels,
+    issueType: "Story",
+    recommendedRelease: candidate.version,
+  };
+
+  writeProjectOverride(projectId, {
+    ...current,
+    releaseCandidates: remaining,
+    backfillCandidates: dedupeBackfill([backfill, ...(current.backfillCandidates ?? [])]),
   });
 }
 
@@ -119,6 +233,8 @@ export function mergeProjectWithOverrides(projectId: string): ProjectRecord | un
     releases: dedupe([...(base.releases ?? []), ...(current.releases ?? [])]),
     capabilities: dedupe([...(base.capabilities ?? []), ...(current.capabilities ?? []), ...derivedCapabilities]),
     integrations: dedupe([...(base.integrations ?? []), ...(current.integrations ?? [])]),
-    importedJiraIssues
+    importedJiraIssues,
+    backfillCandidates: dedupeBackfill([...(base.backfillCandidates ?? []), ...(current.backfillCandidates ?? [])]),
+    releaseCandidates: dedupeCandidates([...(base.releaseCandidates ?? []), ...(current.releaseCandidates ?? [])]),
   };
 }

@@ -35,11 +35,8 @@ export function summarizeBackfill(project: ProjectRecord) {
 
   for (const candidate of candidates) {
     const matchingIssues = findMatchingJiraIssues(candidate, issues);
-    if (matchingIssues.length) {
-      resolved.push({ candidate, matchingIssues });
-    } else {
-      unresolved.push(candidate);
-    }
+    if (matchingIssues.length) resolved.push({ candidate, matchingIssues });
+    else unresolved.push(candidate);
   }
 
   return {

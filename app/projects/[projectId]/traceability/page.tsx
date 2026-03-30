@@ -1,12 +1,13 @@
-import { notFound } from "next/navigation";
+"use client";
+
 import { AppShell } from "@/components/app-shell";
 import { SectionHeader, StatusBadge } from "@/components/ui";
-import { getProject } from "@/lib/mock-data";
 import { summarizeBackfill } from "@/lib/backfill";
+import { useProjectRecord } from "@/hooks/useProjectRecord";
 
 export default function TraceabilityPage({ params }: { params: { projectId: string } }) {
-  const project = getProject(params.projectId);
-  if (!project) return notFound();
+  const { project } = useProjectRecord(params.projectId);
+  if (!project) return <AppShell projectId={params.projectId}><div className="card p-6">Project not found.</div></AppShell>;
   const backfill = summarizeBackfill(project);
 
   return (
@@ -20,9 +21,7 @@ export default function TraceabilityPage({ params }: { params: { projectId: stri
               {project.releases.map((release) => (
                 <div key={release.id} className="rounded-2xl border border-slate-200 p-4">
                   <div className="font-medium text-slate-900">{release.version}</div>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {release.jiraLinks.map((jira) => <span key={jira.key} className="badge badge-neutral">{jira.key}</span>)}
-                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2">{release.jiraLinks.map((jira) => <span key={jira.key} className="badge badge-neutral">{jira.key}</span>)}</div>
                   {release.jiraBackfillRequired ? <div className="mt-2 text-sm text-rose-600">Jira backfill required before release-ready.</div> : null}
                 </div>
               ))}
@@ -33,10 +32,7 @@ export default function TraceabilityPage({ params }: { params: { projectId: stri
             <div className="mt-4 space-y-3">
               {project.parityAlerts.map((alert) => (
                 <div key={alert.id} className="rounded-2xl border border-slate-200 p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="font-medium text-slate-900">{alert.sourceSurface} → {alert.affectedSurface}</div>
-                    <StatusBadge tone={alert.state === "resolved" ? "success" : alert.state === "tracked" ? "info" : "warning"}>{alert.state}</StatusBadge>
-                  </div>
+                  <div className="flex items-center justify-between gap-3"><div className="font-medium text-slate-900">{alert.sourceSurface} → {alert.affectedSurface}</div><StatusBadge tone={alert.state === "resolved" ? "success" : alert.state === "tracked" ? "info" : "warning"}>{alert.state}</StatusBadge></div>
                   <p className="mt-2 text-sm text-slate-600">{alert.reason}</p>
                   {alert.jiraKey ? <div className="mt-2 text-xs text-slate-500">Mapped issue: {alert.jiraKey}</div> : null}
                 </div>
@@ -46,21 +42,8 @@ export default function TraceabilityPage({ params }: { params: { projectId: stri
         </div>
 
         <section className="card p-6">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h3 className="text-lg font-semibold text-slate-900">Deployed features without Jira tickets</h3>
-              <p className="mt-2 text-sm text-slate-600">These rows need CSV export and Jira creation before they can move into the normal backlog flow.</p>
-            </div>
-            <StatusBadge tone={backfill.unresolved.length ? "warning" : "success"}>{backfill.unresolved.length ? `${backfill.unresolved.length} unresolved` : "all linked"}</StatusBadge>
-          </div>
-          <div className="mt-4 space-y-3">
-            {backfill.unresolved.length ? backfill.unresolved.map((candidate) => (
-              <div key={candidate.id} className="rounded-2xl border border-slate-200 p-4">
-                <div className="font-medium text-slate-900">{candidate.summary}</div>
-                <div className="mt-2 text-sm text-slate-600">{candidate.description}</div>
-              </div>
-            )) : <div className="text-sm text-slate-600">No unresolved backfill candidates.</div>}
-          </div>
+          <div className="flex items-center justify-between gap-3"><div><h3 className="text-lg font-semibold text-slate-900">Deployed features without Jira tickets</h3><p className="mt-2 text-sm text-slate-600">These rows need CSV export and Jira creation before they can move into the normal backlog flow.</p></div><StatusBadge tone={backfill.unresolved.length ? "warning" : "success"}>{backfill.unresolved.length ? `${backfill.unresolved.length} unresolved` : "all linked"}</StatusBadge></div>
+          <div className="mt-4 space-y-3">{backfill.unresolved.length ? backfill.unresolved.map((candidate) => (<div key={candidate.id} className="rounded-2xl border border-slate-200 p-4"><div className="font-medium text-slate-900">{candidate.summary}</div><div className="mt-2 text-sm text-slate-600">{candidate.description}</div></div>)) : <div className="text-sm text-slate-600">No unresolved backfill candidates.</div>}</div>
         </section>
       </div>
     </AppShell>

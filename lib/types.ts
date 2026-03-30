@@ -47,6 +47,18 @@ export interface ReleaseSource {
   label?: string;
 }
 
+export interface ReleaseChangelogSection {
+  heading: string;
+  bullets: string[];
+  prose: string[];
+}
+
+export interface ReleaseChangelogExcerpt {
+  title: string;
+  date?: string;
+  sections: ReleaseChangelogSection[];
+}
+
 export interface ReleaseItem {
   id: string;
   version: string;
@@ -64,6 +76,9 @@ export interface ReleaseItem {
   jiraLinks: JiraLink[];
   source?: ReleaseSource;
   deploymentComment?: string;
+  commitMessage?: string;
+  commitUrl?: string;
+  changelog?: ReleaseChangelogExcerpt;
 }
 
 export interface CapabilityRecord {
@@ -113,6 +128,36 @@ export interface BackfillCandidate {
   recommendedRelease?: string;
 }
 
+export interface ReleaseCandidateCheck {
+  key: string;
+  label: string;
+  present: boolean;
+  value?: string;
+}
+
+export interface ReleaseCandidate {
+  id: string;
+  version: string;
+  surfaces: Surface[];
+  detectedAt: string;
+  source: ReleaseSource;
+  repoUrl: string;
+  hostingProvider: "vercel" | "supabase" | "custom";
+  hostingUrl: string;
+  hostingSummary?: string;
+  commitSha?: string;
+  commitMessage?: string;
+  commitUrl?: string;
+  jiraKeys: string[];
+  changelog?: ReleaseChangelogExcerpt;
+  releaseNotes: string;
+  requiredChecks: ReleaseCandidateCheck[];
+  integrationsChanged: string[];
+  backendChanged: boolean;
+  sharedContractChanged: boolean;
+  schemaChanged: boolean;
+}
+
 export interface ProjectRecord {
   id: string;
   tenantId: string;
@@ -129,6 +174,7 @@ export interface ProjectRecord {
   parityAlerts: ParityAlert[];
   importedJiraIssues?: ImportedJiraIssue[];
   backfillCandidates?: BackfillCandidate[];
+  releaseCandidates?: ReleaseCandidate[];
   deploymentStatus: DeploymentStatus;
   overview?: ProjectOverview;
 }
@@ -147,4 +193,20 @@ export interface ProjectImportBundle {
   importedJiraIssues: ImportedJiraIssue[];
 }
 
-export interface ProjectOverride extends Partial<ProjectImportBundle> {}
+export interface ProjectOverride extends Partial<ProjectImportBundle> {
+  backfillCandidates?: BackfillCandidate[];
+  releaseCandidates?: ReleaseCandidate[];
+}
+
+export interface ProjectIntegrationSettings {
+  jiraUrl?: string;
+  jiraEmail?: string;
+  jiraToken?: string;
+  jiraPreviewLimit?: number;
+  jiraQueryAll?: boolean;
+  repoUrl?: string;
+  githubToken?: string;
+  hostingProvider?: "vercel" | "supabase" | "custom";
+  hostingUrl?: string;
+  hostingApiKey?: string;
+}
