@@ -11,3 +11,10 @@
 - **Javítás:** a selected project `jiraProjectKey` kötelező input lett az API-nak; issue/project/JQL import mind project-locked szűrőt kap.
 - **Megelőzés:** multi-project governance appban minden külső lekérdezést tenant/project contexthez kell kötni, nem elég a felhasználó által megadott URL-ben bízni.
 - **Ellenőrzés:** HOB projekt oldalon csak HOB issue-k jöhetnek vissza; SYN oldalon csak SYN; RLG oldalon csak RLG.
+
+### [022] Shared domain interface regresszió: UI már használ mezőt, de a közös típusból kikerül
+- **Tünet / log:** `Property 'backfillCandidates' does not exist on type 'ProjectRecord'.` build hiba az `app/projects/[projectId]/page.tsx` fájlban.
+- **Kiváltó ok:** a backfill feature több oldalon már a `project.backfillCandidates` mezőre épült, de a `lib/types.ts` aktuális `ProjectRecord` interfészéből ez a mező hiányzott.
+- **Javítás:** a `BackfillCandidate` interfészt és a `backfillCandidates?: BackfillCandidate[]` mezőt vissza kell vezetni a közös típusrétegbe.
+- **Megelőzés:** ha egy shared domain mezőt több képernyő is használ, minden type-only patch után ellenőrizni kell, hogy a `lib/types.ts` továbbra is tartalmazza-e a mezőt.
+- **Ellenőrzés:** keress rá a repo-ban a `backfillCandidates` használataira, és ellenőrizd, hogy a shared interface deklarálja-e a mezőt, mielőtt új buildet indítasz.
