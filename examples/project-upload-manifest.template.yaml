@@ -1,0 +1,36 @@
+schemaVersion: "1.0.0"
+project:
+  name: "Example Project"
+  slug: "example-project"
+  domain: "example.releasegovernance.dev"
+  jiraProjectKey: "EXP"
+  lovableProject: ""
+  repositories:
+    web: "https://github.com/example/web"
+    android: "https://github.com/example/mobile-android"
+    ios: "https://github.com/example/mobile-ios"
+sources:
+  markdownInventory: true
+  csvImport: true
+  xlsxImport: true
+  jiraProject: true
+  githubRepo: true
+  vercelProject: true
+  supabaseBackend: true
+  changelogFiles: true
+  manualNotes: false
+connections:
+  jiraUrl: "https://example.atlassian.net/jira/software/projects/EXP"
+  jiraEmail: "owner@example.com"
+  jiraApiToken: "REDACTED"
+  repoUrl: "https://github.com/example/web"
+  githubToken: "REDACTED"
+  hostingProvider: "vercel"
+  hostingUrl: "https://example.vercel.app"
+  hostingApiKey: "REDACTED"
+  supabaseUrl: "https://project.supabase.co"
+  supabaseProjectRef: "project"
+classification:
+  useJiraAsAuthoritativeIssueUniverse: true
+  useMarkdownForBusinessGrouping: true
+  useRepoAndChangelogForReleaseEvidence: true

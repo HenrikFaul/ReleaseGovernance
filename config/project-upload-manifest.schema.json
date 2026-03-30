@@ -1,0 +1,141 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ReleaseGovernance Project Upload Manifest",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "project",
+    "sources",
+    "connections"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "string"
+    },
+    "project": {
+      "type": "object",
+      "required": [
+        "name",
+        "slug",
+        "jiraProjectKey"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "slug": {
+          "type": "string"
+        },
+        "domain": {
+          "type": "string"
+        },
+        "jiraProjectKey": {
+          "type": "string"
+        },
+        "lovableProject": {
+          "type": "string"
+        },
+        "repositories": {
+          "type": "object",
+          "properties": {
+            "web": {
+              "type": "string"
+            },
+            "android": {
+              "type": "string"
+            },
+            "ios": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "sources": {
+      "type": "object",
+      "properties": {
+        "markdownInventory": {
+          "type": "boolean"
+        },
+        "csvImport": {
+          "type": "boolean"
+        },
+        "xlsxImport": {
+          "type": "boolean"
+        },
+        "jiraProject": {
+          "type": "boolean"
+        },
+        "githubRepo": {
+          "type": "boolean"
+        },
+        "vercelProject": {
+          "type": "boolean"
+        },
+        "supabaseBackend": {
+          "type": "boolean"
+        },
+        "changelogFiles": {
+          "type": "boolean"
+        },
+        "manualNotes": {
+          "type": "boolean"
+        }
+      }
+    },
+    "connections": {
+      "type": "object",
+      "properties": {
+        "jiraUrl": {
+          "type": "string"
+        },
+        "jiraEmail": {
+          "type": "string"
+        },
+        "jiraApiToken": {
+          "type": "string"
+        },
+        "repoUrl": {
+          "type": "string"
+        },
+        "githubToken": {
+          "type": "string"
+        },
+        "hostingProvider": {
+          "type": "string",
+          "enum": [
+            "vercel",
+            "supabase",
+            "custom"
+          ]
+        },
+        "hostingUrl": {
+          "type": "string"
+        },
+        "hostingApiKey": {
+          "type": "string"
+        },
+        "supabaseUrl": {
+          "type": "string"
+        },
+        "supabaseProjectRef": {
+          "type": "string"
+        }
+      }
+    },
+    "classification": {
+      "type": "object",
+      "properties": {
+        "useJiraAsAuthoritativeIssueUniverse": {
+          "type": "boolean"
+        },
+        "useMarkdownForBusinessGrouping": {
+          "type": "boolean"
+        },
+        "useRepoAndChangelogForReleaseEvidence": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}
