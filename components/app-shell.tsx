@@ -1,19 +1,6 @@
 import Link from "next/link";
 import { ReactNode } from "react";
-
-function navigation(projectId?: string) {
-  if (!projectId) return [{ href: "/projects", label: "Projects" }];
-  return [
-    { href: "/projects", label: "Projects" },
-    { href: `/projects/${projectId}`, label: "Dashboard" },
-    { href: `/projects/${projectId}/releases`, label: "Releases" },
-    { href: `/projects/${projectId}/capabilities`, label: "Capabilities" },
-    { href: `/projects/${projectId}/integrations`, label: "Integrations" },
-    { href: `/projects/${projectId}/traceability`, label: "Traceability" },
-    { href: `/projects/${projectId}/automation`, label: "Automation" },
-    { href: `/projects/${projectId}/import`, label: "Import" }
-  ];
-}
+import { resolveNavigation } from "@/lib/runtime-control";
 
 export function AppShell({
   children,
@@ -24,7 +11,7 @@ export function AppShell({
   projectId?: string;
   projectName?: string;
 }) {
-  const items = navigation(projectId);
+  const items = resolveNavigation(projectId);
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="mx-auto flex max-w-7xl gap-6 px-4 py-6 lg:px-8">

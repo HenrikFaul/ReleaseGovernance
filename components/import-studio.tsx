@@ -26,14 +26,23 @@ function formatDate(value?: string) {
 }
 
 function projectDefaults(projectId: string) {
-  if (projectId === "project_hobbeast") return { projectKey: "HOB" };
-  if (projectId === "project_syncfolk") return { projectKey: "SYN" };
-  return { projectKey: "RLG" };
+  const project = getProject(projectId);
+  return { projectKey: project?.jiraProjectKey ?? "RLG" };
 }
 
 function checkTone(present: boolean) {
   return present ? "bg-emerald-50 border-emerald-200 text-emerald-800" : "bg-slate-50 border-slate-200 text-slate-600";
 }
+
+type RuntimeControlResponse = {
+  projectUpload?: {
+    enabled?: boolean;
+    sources?: string[];
+    jira?: { acceptedInputs?: string[] };
+    github?: { acceptedInputs?: string[] };
+    hosting?: { acceptedProviders?: string[] };
+  };
+};
 
 export function ImportStudio({ projectId }: { projectId: string }) {
   const project = getProject(projectId);
@@ -41,11 +50,13 @@ export function ImportStudio({ projectId }: { projectId: string }) {
   const [bundle, setBundle] = useState<ProjectImportBundle | null>(null);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
+  const [runtimeControl, setRuntimeControl] = useState<RuntimeControlResponse | null>(null);
   const defaults = projectDefaults(projectId);
 
   const [jiraUrl, setJiraUrl] = useState("");
   const [jiraEmail, setJiraEmail] = useState("");
   const [jiraToken, setJiraToken] = useState("");
+  const [jiraProjectKey, setJiraProjectKey] = useState(defaults.projectKey);
   const [jiraPreviewLimit, setJiraPreviewLimit] = useState(10);
   const [jiraQueryAll, setJiraQueryAll] = useState(false);
 
@@ -55,12 +66,22 @@ export function ImportStudio({ projectId }: { projectId: string }) {
   const [hostingUrl, setHostingUrl] = useState("");
   const [hostingApiKey, setHostingApiKey] = useState("");
   const [previewIssues, setPreviewIssues] = useState<any[]>([]);
+  const [selectedProjectUploadSources, setSelectedProjectUploadSources] = useState<string[]>(["jira", "github", "hosting"]);
+  const [projectUploadPreview, setProjectUploadPreview] = useState<any>(null);
+
+  useEffect(() => {
+    fetch("/api/runtime-control")
+      .then((res) => res.json())
+      .then((data) => setRuntimeControl(data))
+      .catch(() => setRuntimeControl(null));
+  }, []);
 
   useEffect(() => {
     const settings = readProjectSettings(projectId);
     setJiraUrl(settings.jiraUrl ?? "");
     setJiraEmail(settings.jiraEmail ?? "");
     setJiraToken(settings.jiraToken ?? "");
+    setJiraProjectKey(settings.jiraProjectKey ?? defaults.projectKey);
     setJiraPreviewLimit(settings.jiraPreviewLimit ?? 10);
     setJiraQueryAll(settings.jiraQueryAll ?? false);
     setRepoUrl(settings.repoUrl ?? project?.repositories.web ?? project?.repositories.android ?? "");
@@ -68,7 +89,7 @@ export function ImportStudio({ projectId }: { projectId: string }) {
     setHostingProvider(settings.hostingProvider ?? "vercel");
     setHostingUrl(settings.hostingUrl ?? (project?.domain ? `https://${project.domain}` : ""));
     setHostingApiKey(settings.hostingApiKey ?? "");
-  }, [projectId]);
+  }, [projectId, defaults.projectKey, project?.repositories.web, project?.repositories.android, project?.domain]);
 
   const summary = useMemo(() => {
     if (!bundle) return null;
@@ -98,6 +119,7 @@ export function ImportStudio({ projectId }: { projectId: string }) {
       jiraUrl,
       jiraEmail,
       jiraToken,
+      jiraProjectKey,
       jiraPreviewLimit,
       jiraQueryAll,
       repoUrl,
@@ -118,13 +140,20 @@ export function ImportStudio({ projectId }: { projectId: string }) {
       const res = await fetch("/api/jira/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jiraUrl, email: jiraEmail, apiToken: jiraToken, projectKey: defaults.projectKey, maxResults: jiraPreviewLimit, queryAll: jiraQueryAll })
+        body: JSON.stringify({
+          jiraUrl,
+          email: jiraEmail,
+          apiToken: jiraToken,
+          projectKey: jiraProjectKey || defaults.projectKey,
+          maxResults: jiraPreviewLimit,
+          queryAll: jiraQueryAll
+        })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Jira import failed.");
       setPreviewIssues(data.issues ?? []);
       if (testOnly) {
-        setStatus(`Previewed ${data.issues?.length ?? 0} Jira issue(s) for ${defaults.projectKey}.`);
+        setStatus(`Previewed ${data.issues?.length ?? 0} Jira issue(s) for ${data.diagnostics?.projectKey ?? jiraProjectKey}.`);
         return;
       }
       setBundle((current) => ({
@@ -133,7 +162,7 @@ export function ImportStudio({ projectId }: { projectId: string }) {
         integrations: current?.integrations ?? [],
         importedJiraIssues: [...(current?.importedJiraIssues ?? []), ...(data.issues ?? [])],
       }));
-      setStatus(`Imported ${data.issues?.length ?? 0} Jira issue(s). These will also appear in Capabilities as imported Jira capability candidates.`);
+      setStatus(`Imported ${data.issues?.length ?? 0} Jira issue(s). These also become capability candidates on the Capabilities page.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Jira import failed.");
     }
@@ -146,7 +175,7 @@ export function ImportStudio({ projectId }: { projectId: string }) {
       const res = await fetch("/api/release-detection", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId, projectSlug: project?.slug ?? projectId, projectKey: defaults.projectKey, repoUrl, githubToken, hostingProvider, hostingUrl, hostingApiKey })
+        body: JSON.stringify({ projectId, projectSlug: project?.slug ?? projectId, projectKey: jiraProjectKey || defaults.projectKey, repoUrl, githubToken, hostingProvider, hostingUrl, hostingApiKey })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Release detection failed.");
@@ -155,6 +184,38 @@ export function ImportStudio({ projectId }: { projectId: string }) {
       setStatus(`Fetched latest release candidate ${data.candidate.version}. Review required checks and approve when ready.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Release detection failed.");
+    }
+  }
+
+  async function previewProjectUpload() {
+    setError("");
+    setStatus("");
+    try {
+      const res = await fetch("/api/project-upload/preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectName: project?.name ?? projectId,
+          projectKey: jiraProjectKey || defaults.projectKey,
+          selectedSources: selectedProjectUploadSources,
+          jiraUrl,
+          jiraEmail,
+          jiraToken,
+          jiraPreviewLimit,
+          repoUrl,
+          githubToken,
+          hostingProvider,
+          hostingUrl,
+          hostingApiKey,
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Project upload preview failed.");
+      setProjectUploadPreview(data.preview);
+      setBundle(data.bundle);
+      setStatus(`Project upload preview ready: ${data.preview.jiraIssues} Jira issue(s), ${data.preview.capabilities} capability candidates, ${data.preview.integrations} integrations.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Project upload preview failed.");
     }
   }
 
@@ -171,11 +232,20 @@ export function ImportStudio({ projectId }: { projectId: string }) {
     setStatus("Release candidate approved and routed to the correct governance destination.");
   }
 
+  function toggleUploadSource(source: string) {
+    setSelectedProjectUploadSources((current) =>
+      current.includes(source) ? current.filter((item) => item !== source) : [...current, source]
+    );
+  }
+
   function downloadXlsx() {
     const wb = createTemplateWorkbook();
     const buffer = XLSX.write(wb, { type: "array", bookType: "xlsx" });
     download("releasegovernance-import-template.xlsx", buffer, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
   }
+
+  const uploadSources = runtimeControl?.projectUpload?.sources ?? ["markdown", "csv", "excel", "jira", "github", "hosting", "changelog"];
+  const acceptedProviders = runtimeControl?.projectUpload?.hosting?.acceptedProviders ?? ["vercel", "supabase", "custom"];
 
   return (
     <div className="space-y-6">
@@ -195,24 +265,27 @@ export function ImportStudio({ projectId }: { projectId: string }) {
         <div className="flex items-center justify-between gap-3">
           <div>
             <h3 className="text-lg font-semibold text-slate-900">Jira + release detection settings</h3>
-            <p className="mt-2 text-sm text-slate-600">All credentials are stored per project. Jira queries are forced to {defaults.projectKey}. Release detection reads the latest GitHub commit, hosting status and optional CHANGELOG entry.</p>
+            <p className="mt-2 text-sm text-slate-600">Use a base Jira URL + project key, an issue URL, a project URL or an issues/JQL URL. Release detection reads the latest GitHub commit, optional CHANGELOG.md entry, optional commit comment and hosting reachability into a candidate row.</p>
           </div>
           <button onClick={saveSettings} className="rounded-2xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">Save settings</button>
         </div>
         <div className="grid gap-3 md:grid-cols-2">
-          <input value={jiraUrl} onChange={(e) => setJiraUrl(e.target.value)} placeholder={`https://example.atlassian.net/jira/software/projects/${defaults.projectKey}`} className="rounded-2xl border border-slate-200 px-4 py-3 text-sm" />
+          <input value={jiraUrl} onChange={(e) => setJiraUrl(e.target.value)} placeholder="https://example.atlassian.net or project/issue URL" className="rounded-2xl border border-slate-200 px-4 py-3 text-sm" />
+          <input value={jiraProjectKey} onChange={(e) => setJiraProjectKey(e.target.value.toUpperCase())} placeholder="Project key (e.g. HOB, SYN, RLG)" className="rounded-2xl border border-slate-200 px-4 py-3 text-sm" />
           <input value={jiraEmail} onChange={(e) => setJiraEmail(e.target.value)} placeholder="Jira account email" className="rounded-2xl border border-slate-200 px-4 py-3 text-sm" />
-          <input value={jiraToken} type="password" onChange={(e) => setJiraToken(e.target.value)} placeholder="Jira API token" className="rounded-2xl border border-slate-200 px-4 py-3 text-sm md:col-span-2" />
+          <input value={jiraToken} type="password" onChange={(e) => setJiraToken(e.target.value)} placeholder="Jira API token" className="rounded-2xl border border-slate-200 px-4 py-3 text-sm" />
           <input value={repoUrl} onChange={(e) => setRepoUrl(e.target.value)} placeholder="https://github.com/owner/repo or owner/repo" className="rounded-2xl border border-slate-200 px-4 py-3 text-sm" />
           <input value={githubToken} type="password" onChange={(e) => setGithubToken(e.target.value)} placeholder="GitHub API token" className="rounded-2xl border border-slate-200 px-4 py-3 text-sm" />
-          <select value={hostingProvider} onChange={(e) => setHostingProvider(e.target.value as any)} className="rounded-2xl border border-slate-200 px-4 py-3 text-sm"><option value="vercel">Vercel</option><option value="supabase">Supabase</option><option value="custom">Custom</option></select>
+          <select value={hostingProvider} onChange={(e) => setHostingProvider(e.target.value as any)} className="rounded-2xl border border-slate-200 px-4 py-3 text-sm">
+            {acceptedProviders.map((provider) => <option key={provider} value={provider}>{provider}</option>)}
+          </select>
           <input value={hostingUrl} onChange={(e) => setHostingUrl(e.target.value)} placeholder="https://your-hosting-endpoint" className="rounded-2xl border border-slate-200 px-4 py-3 text-sm" />
           <input value={hostingApiKey} type="password" onChange={(e) => setHostingApiKey(e.target.value)} placeholder="Hosting API key" className="rounded-2xl border border-slate-200 px-4 py-3 text-sm md:col-span-2" />
         </div>
         <div className="grid gap-3 md:grid-cols-[1fr,160px,220px]">
-          <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-3 text-sm text-slate-600">Project filter enforced: <span className="font-semibold text-slate-900">project = {defaults.projectKey}</span></div>
+          <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-3 text-sm text-slate-600">Current project key: <span className="font-semibold text-slate-900">{jiraProjectKey || defaults.projectKey}</span></div>
           <input type="number" min={1} max={100} value={jiraPreviewLimit} onChange={(e) => setJiraPreviewLimit(Number(e.target.value) || 10)} className="rounded-2xl border border-slate-200 px-4 py-3 text-sm" />
-          <label className="flex items-center gap-3 rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-700"><input type="checkbox" checked={jiraQueryAll} onChange={(e) => setJiraQueryAll(e.target.checked)} /> Query all available project issues</label>
+          <label className="flex items-center gap-3 rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-700"><input type="checkbox" checked={jiraQueryAll} onChange={(e) => setJiraQueryAll(e.target.checked)} /> Query up to 100 project issues</label>
         </div>
         <div className="flex flex-wrap gap-3">
           <button onClick={() => onJiraImport(true)} className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Test Jira query</button>
@@ -220,6 +293,39 @@ export function ImportStudio({ projectId }: { projectId: string }) {
           <button onClick={detectReleaseCandidate} className="rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700">Fetch latest release candidate</button>
         </div>
       </section>
+
+      {runtimeControl?.projectUpload?.enabled !== false ? (
+        <section className="card p-6 space-y-4">
+          <div>
+            <h3 className="text-lg font-semibold text-slate-900">Project upload</h3>
+            <p className="mt-2 text-sm text-slate-600">Choose which source systems to use for bootstrapping this project. The preview will convert available Jira work into imported Jira rows and capability candidates, and register selected repo/hosting sources as integrations.</p>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            {uploadSources.map((source) => (
+              <button
+                key={source}
+                type="button"
+                onClick={() => toggleUploadSource(source)}
+                className={`rounded-2xl border px-4 py-2 text-sm font-medium ${selectedProjectUploadSources.includes(source) ? "border-brand-200 bg-brand-50 text-brand-700" : "border-slate-200 text-slate-700 hover:bg-slate-50"}`}
+              >
+                {source}
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <button onClick={previewProjectUpload} className="rounded-2xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">Preview project upload</button>
+            <button onClick={apply} disabled={!bundle} className="rounded-2xl bg-brand-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 hover:bg-brand-700">Apply preview to project</button>
+          </div>
+          {projectUploadPreview ? (
+            <div className="grid gap-4 md:grid-cols-4">
+              <div className="rounded-2xl bg-slate-50 p-4 text-sm"><div className="text-slate-500">Jira issues</div><div className="mt-1 text-xl font-semibold text-slate-900">{projectUploadPreview.jiraIssues}</div></div>
+              <div className="rounded-2xl bg-slate-50 p-4 text-sm"><div className="text-slate-500">Capabilities</div><div className="mt-1 text-xl font-semibold text-slate-900">{projectUploadPreview.capabilities}</div></div>
+              <div className="rounded-2xl bg-slate-50 p-4 text-sm"><div className="text-slate-500">Integrations</div><div className="mt-1 text-xl font-semibold text-slate-900">{projectUploadPreview.integrations}</div></div>
+              <div className="rounded-2xl bg-slate-50 p-4 text-sm"><div className="text-slate-500">Releases</div><div className="mt-1 text-xl font-semibold text-slate-900">{projectUploadPreview.releases}</div></div>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
 
       {previewIssues.length ? (
         <section className="card p-6">
@@ -239,7 +345,6 @@ export function ImportStudio({ projectId }: { projectId: string }) {
                   <div className="flex items-start gap-3"><button onClick={() => approve(candidate.id)} className="rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700">Jóváhagy</button><div><div className="text-lg font-semibold text-slate-900">{candidate.version}</div><div className="mt-1 text-sm text-slate-600">{candidate.releaseNotes}</div><div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">{candidate.surfaces.map((surface) => <span key={surface} className="badge badge-info">{surface}</span>)}<span className="badge badge-neutral">{candidate.hostingProvider}</span>{candidate.jiraKeys.length ? <span className="badge badge-neutral">Jira: {candidate.jiraKeys.join(", ")}</span> : <span className="badge badge-warning">No Jira detected</span>}</div></div></div><div className="text-sm text-slate-500">Detected {formatDate(candidate.detectedAt)}</div>
                 </div>
                 <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">{candidate.requiredChecks.map((check) => (<div key={check.key} className={`rounded-2xl border px-4 py-3 text-sm ${checkTone(check.present)}`}><div className="font-medium">{check.label}</div><div className="mt-1 break-all text-xs">{check.value ?? "missing"}</div></div>))}</div>
-                {(candidate.commitMessage || candidate.changelog) ? <div className="mt-4 grid gap-4 xl:grid-cols-2"><div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700"><div className="font-medium text-slate-900">Commit comment</div><div className="mt-2">{candidate.commitMessage ?? "—"}</div>{candidate.commitUrl ? <a href={candidate.commitUrl} className="mt-2 inline-block text-brand-700 hover:underline">Open commit</a> : null}</div><div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700"><div className="font-medium text-slate-900">Latest CHANGELOG entry</div><div className="mt-2">{candidate.changelog?.title ?? "No project-scoped changelog entry detected."}</div></div></div> : null}
               </div>
             ))}
           </div>

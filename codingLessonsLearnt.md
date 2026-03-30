@@ -9,23 +9,23 @@ Kötelező szerkezet minden új bejegyzésnél:
 - Megelőzés
 - Ellenőrzés
 
-### [025] Local override state must be used on project pages that need to reflect approvals
-- **Tünet / log:** approved releases or backfill candidates would not appear on pages that still rendered only seeded mock data.
-- **Kiváltó ok:** server/static pages used `getProject(...)` directly and ignored local override state written by import/approval workflows.
-- **Javítás:** pages that need to reflect approvals must read merged state through `useProjectRecord(...)`, which combines base project data with local overrides.
-- **Megelőzés:** every new workflow that writes project-local approval/import state must check all consumer pages and make sure they render merged state, not only the static seed.
-- **Ellenőrzés:** approve a release candidate and verify it appears on Dashboard, Releases, Release detail, Traceability, Automation and Capabilities without manually editing `mock-data.ts`.
+### [028] Planned patch is not the same as downloadable patch
+- **Tünet / log:** a felhasználó jogosan jelezte, hogy csak egy felsorolást lát a módosítandó fájlokról, de nincs ténylegesen letölthető zip.
+- **Kiváltó ok:** a javítás meg volt tervezve, de a fájlok nem lettek ténylegesen legenerálva és átadva.
+- **Javítás:** a következő körben mindig ténylegesen generálni kell a módosított fájlokat és zipet.
+- **Megelőzés:** soha ne mondd, hogy kész a patch, ha a letölthető artifact még nem létezik.
+- **Ellenőrzés:** a válasz előtt mindig legyen konkrét sandbox link a zipre.
 
-### [026] Feature detection pipelines need a staging step before they touch official release rows
-- **Tünet / log:** if fetched GitHub/hosting data goes straight to Releases, there is no human checkpoint and incomplete metadata can pollute the governance registry.
-- **Kiváltó ok:** missing candidate layer between raw external data and approved governance rows.
-- **Javítás:** create a release-candidate stage with explicit required-check fields and a `Jóváhagy` action that routes the row either to Releases or Jira CSV backfill.
-- **Megelőzés:** any external ingestion (GitHub, hosting, deployment provider) must land in a reviewable candidate state first.
-- **Ellenőrzés:** fetched release candidates must show required checks, green-filled fields and approval routing to the correct destination.
+### [029] Jira import must support base URL + project key
+- **Tünet / log:** az import funkció minden projektben 0 issue-t adott vissza.
+- **Kiváltó ok:** a route túl sokat feltételezett a bemeneti Jira URL formátumáról, és nem kezelte stabilan a base URL + explicit project key használatot.
+- **Javítás:** a Jira import kapott erősített URL-parse + projectKey fallback logikát és többféle Jira keresési stratégiát.
+- **Megelőzés:** minden külső URL-alapú importnál biztosítani kell explicit, formátumtól független fallback paramétereket.
+- **Ellenőrzés:** teszteld külön issue URL-lel, project URL-lel, JQL URL-lel és sima base URL + project key kombinációval.
 
-### [027] External repo + hosting credentials are project-scoped settings, not global app state
-- **Tünet / log:** without per-project persistence, Hobbeast credentials can overwrite Syncfolk or ReleaseGovernance credentials.
-- **Kiváltó ok:** using a single global form state for multi-project integrations.
-- **Javítás:** persist GitHub/hosting settings under a project-specific storage key and restore them when returning to the project.
-- **Megelőzés:** all external integration settings in ReleaseGovernance must be namespaced by `projectId`.
-- **Ellenőrzés:** save different GitHub/hosting settings for HOB, SYN and RLG, refresh, and verify each project restores its own values.
+### [030] Runtime-control documentation must be wired to runtime behavior
+- **Tünet / log:** a vezérlő YAML és a leírás elkészült, de a live oldalon nem látszott az új projekt-upload funkcionalitás.
+- **Kiváltó ok:** a dokumentációs/config réteg nem volt ténylegesen bekötve az UI-ba.
+- **Javítás:** a sidebar és az import wizard opciói most runtime-control olvasáson keresztül működnek.
+- **Megelőzés:** ha egy fájlról azt állítjuk, hogy vezérli a működést, azt legalább egy route vagy komponens ténylegesen olvassa is.
+- **Ellenőrzés:** módosítsd a runtime-control YAML egy látható elemét, majd ellenőrizd, hogy az UI reagál rá.

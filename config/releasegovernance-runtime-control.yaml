@@ -1,279 +1,63 @@
-schemaVersion: "1.0.0"
-documentRole: "runtime-control-and-project-upload-policy"
-canonicalReadBeforeWork:
-  requiredFiles:
-    - "codingLessonsLearnt.md"
-    - "CHANGELOG.md"
-    - "docs/releasegovernance-project-upload-and-runtime-control.md"
-    - "config/releasegovernance-runtime-control.yaml"
-  rules:
-    - "Always read the whole files before any project import, reseed or governance-model change."
-    - "Append new lessons to codingLessonsLearnt.md, never replace the file."
-    - "Append new deliveries to CHANGELOG.md, never replace the file."
-    - "Do not remove previously delivered capabilities from new seed data unless they are explicitly deprecated and documented."
-navigation:
-  preProjectSelection:
-    visibleMenus:
-      - key: "projects"
-        label: "Projects"
-    hiddenMenus:
-      - "dashboard"
-      - "releases"
-      - "capabilities"
-      - "integrations"
-      - "traceability"
-      - "automation"
-      - "import"
-  projectSelected:
-    visibleMenus:
-      - key: "projects"
-        label: "Projects"
-      - key: "dashboard"
-        label: "Dashboard"
-      - key: "releases"
-        label: "Releases"
-      - key: "capabilities"
-        label: "Capabilities"
-      - key: "integrations"
-        label: "Integrations"
-      - key: "traceability"
-        label: "Traceability"
-      - key: "automation"
-        label: "Automation"
-      - key: "import"
-        label: "Import"
-  projectScopedMenusOnly: true
-pages:
-  dashboard:
-    requiredCards:
-      - "released_versions"
-      - "unreleased_groups"
-      - "capabilities"
-      - "open_parity_alerts"
-      - "imported_jira_items"
-    requiredOverviewFields:
-      - "applicationDescription"
-      - "techStack"
-      - "hostingServices"
-      - "backendServices"
-      - "projectStructure"
-      - "runtimeNotes"
-    latestReleasePosture: true
-    openParityAlerts: true
-  releases:
-    sections:
-      - "released"
-      - "unreleased"
-    releasedRowFields:
-      - "version"
-      - "surfaces"
-      - "status"
-      - "deployDate"
-      - "sourceKind"
-      - "sourceRepository"
-      - "issueCount"
-      - "deploymentComment"
-      - "jiraLinked"
-    releaseDetail:
-      requiredBlocks:
-        - "release_header"
-        - "delivered_capabilities"
-        - "jira_traceability"
-        - "impact_evaluation"
-      jiraDisplayFields:
-        - "key"
-        - "summary"
-        - "status"
-        - "url"
-  capabilities:
-    requiredFields:
-      - "id"
-      - "name"
-      - "summary"
-      - "description"
-      - "tenant"
-      - "channel"
-      - "statusBySurface"
-      - "parityStatus"
-      - "integrations"
-      - "jiraKeys"
-    includeUnreleasedValidJira: true
-    invalidJiraAllowed: false
-  integrations:
-    categories:
-      - "source-control"
-      - "planning"
-      - "deployment"
-      - "backend"
-      - "external-api"
-      - "design"
-      - "documentation"
-    requiredFields:
-      - "id"
-      - "name"
-      - "category"
-      - "state"
-      - "environmentSensitive"
-      - "notes"
-      - "url"
-  traceability:
-    requiredViews:
-      - "imported_jira_issues"
-      - "release_to_jira_mapping"
-      - "capability_to_jira_mapping"
-      - "parity_to_jira_mapping"
-      - "backfill_candidates"
-    jiraFields:
-      - "key"
-      - "summary"
-      - "description"
-      - "labels"
-      - "url"
-      - "status"
-      - "issueType"
-      - "created"
-      - "parentKey"
-  automation:
-    requiredItems:
-      - "release-impact-standard"
-      - "capability-registry-standard"
-      - "integration-registry-standard"
-      - "github-actions-starter"
-      - "codeowners-guidance"
-      - "release-please-guidance"
-  import:
-    templates:
-      - "md"
-      - "csv"
-      - "xlsx"
-    functions:
-      - "file_import"
-      - "jira_import"
-      - "project_upload_wizard"
-      - "release_candidate_detection"
-    canonicalColumns:
-      - "record_type"
-      - "id"
-      - "name"
-      - "summary"
-      - "description"
-      - "status"
-      - "version"
-      - "release_state"
-      - "surface"
-      - "tenant"
-      - "channel"
-      - "integrations"
-      - "jira_keys"
-      - "jira_summary"
-      - "jira_description"
-      - "jira_labels"
-      - "deploy_date"
-      - "source_kind"
-      - "source_repository"
-      - "source_owner"
-      - "deployment_comment"
-      - "parity_status"
-      - "backend_changed"
-      - "shared_contract_changed"
-      - "schema_changed"
-      - "url"
+version: 1
+sidebar:
+  showProjectSpecificNavigationOnlyWhenProjectSelected: true
+  globalItems:
+    - id: projects
+      label: Projects
+      href: /projects
+  projectItems:
+    - id: dashboard
+      label: Dashboard
+      hrefTemplate: /projects/{projectId}
+    - id: releases
+      label: Releases
+      hrefTemplate: /projects/{projectId}/releases
+    - id: capabilities
+      label: Capabilities
+      hrefTemplate: /projects/{projectId}/capabilities
+    - id: integrations
+      label: Integrations
+      hrefTemplate: /projects/{projectId}/integrations
+    - id: traceability
+      label: Traceability
+      hrefTemplate: /projects/{projectId}/traceability
+    - id: automation
+      label: Automation
+      hrefTemplate: /projects/{projectId}/automation
+    - id: import
+      label: Import
+      hrefTemplate: /projects/{projectId}/import
+
 projectUpload:
-  wizardSteps:
-    - "basic_project_identity"
-    - "source_selection"
-    - "credentials_and_connections"
-    - "normalization_preview"
-    - "apply"
-  basicProjectIdentity:
-    requiredFields:
-      - "projectName"
-      - "slug"
-      - "domain"
-      - "jiraProjectKey"
-      - "repositories.web"
-      - "repositories.android"
-      - "repositories.ios"
-    optionalFields:
-      - "lovableProject"
-  sourceSelection:
-    availableSources:
-      - "markdown_inventory"
-      - "csv_import"
-      - "xlsx_import"
-      - "jira_project"
-      - "github_repo"
-      - "vercel_project"
-      - "supabase_backend"
-      - "changelog_files"
-      - "manual_notes"
-  credentialsAndConnections:
-    fields:
-      - "jiraUrl"
-      - "jiraEmail"
-      - "jiraApiToken"
-      - "repoUrl"
-      - "githubToken"
-      - "hostingProvider"
-      - "hostingUrl"
-      - "hostingApiKey"
-      - "supabaseUrl"
-      - "supabaseProjectRef"
-sourceAuthority:
+  enabled: true
+  sources:
+    - markdown
+    - csv
+    - excel
+    - jira
+    - github
+    - hosting
+    - changelog
   jira:
-    role: "authoritative_issue_universe"
-    description: "Only Jira direct import or Jira CSV can validate Jira keys."
-  markdown:
-    role: "authoritative_business_interpretation"
-    description: "Markdown inventories drive implemented/spec-only interpretation, business grouping and tenant/channel semantics."
+    enabled: true
+    acceptedInputs:
+      - base-url-plus-project-key
+      - issue-url
+      - project-url
+      - jql-url
   github:
-    role: "authoritative_code_evidence"
-    description: "Repository structure and changelog files provide implementation/release evidence."
-  changelog:
-    role: "authoritative_release_evidence"
-    description: "If a feature is tied to a changelog entry, it strongly supports released classification."
+    enabled: true
+    acceptedInputs:
+      - repository-url
+      - owner-repo
   hosting:
-    role: "authoritative_deployment_evidence"
-    description: "Vercel/Supabase/custom hosting metadata provide deployment dates and current-vs-old posture."
-classificationRules:
-  released:
-    requiresValidJira: true
-    evidenceAnyOf:
-      - "repo_evidence"
-      - "changelog_evidence"
-      - "hosting_evidence"
-      - "markdown_explicit_implemented"
-      - "backend_contract_applied"
-      - "approved_release_candidate"
-  unreleased:
-    conditionsAnyOf:
-      - "valid_jira_without_release_evidence"
-      - "parity_follow_up"
-      - "documentation_backfill"
-      - "enterprise_future_scope"
-      - "draft_scope"
-capabilityGrouping:
-  strategy:
-    - "Use valid Jira issue set as the complete issue universe."
-    - "Use markdown inventory to infer business domains and implementation posture."
-    - "Group by summary, description and labels into logical business capabilities."
-    - "Assign tenant as B2C, Enterprise or Both."
-    - "Assign channel as Webapp, Mobile or Both."
-    - "If a capability is implemented and evidence exists, bind it to one or more releases."
-    - "If not implemented, keep it in capabilities and unreleased groups."
-validation:
-  hardRules:
-    - "No invalid Jira key may appear in releases, capabilities or imported Jira issues."
-    - "No valid Jira issue may be silently dropped once authoritative Jira input is available."
-    - "Project-scoped menus must not render before project selection."
-    - "Imported data must be project-scoped after selection."
-    - "Templates for MD, CSV and XLSX must use the same canonical field model."
-rendering:
-  releaseRowStyle: "vercel-like-list-then-detail"
-  projectSelectionStyle: "cards"
-  jiraIssueDisplay: "key-plus-summary-plus-status-plus-url"
-futureChangeControl:
-  sourceOfTruthFiles:
-    - "docs/releasegovernance-project-upload-and-runtime-control.md"
-    - "config/releasegovernance-runtime-control.yaml"
-  behaviorShouldFollowConfig: true
+    enabled: true
+    acceptedProviders:
+      - vercel
+      - supabase
+      - custom
+  behaviors:
+    jiraIssuesBecomeImportedJiraIssues: true
+    jiraIssuesAlsoBecomeCapabilityCandidates: true
+    githubAndHostingCanGenerateReleaseCandidates: true
+    importedDataAppliesToCurrentProjectOnly: true

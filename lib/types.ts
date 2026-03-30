@@ -202,6 +202,7 @@ export interface ProjectIntegrationSettings {
   jiraUrl?: string;
   jiraEmail?: string;
   jiraToken?: string;
+  jiraProjectKey?: string;
   jiraPreviewLimit?: number;
   jiraQueryAll?: boolean;
   repoUrl?: string;
