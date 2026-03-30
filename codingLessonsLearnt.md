@@ -1,20 +1,24 @@
-### [020] User-entered integration credentials must survive UI refreshes unless explicitly cleared
-- **Tünet / log:** Jira token, email and URL eltűnt a frissítés után az Import Studio felületről.
-- **Kiváltó ok:** az űrlapállapot csak React state-ben élt, nem volt per-project persistálás a böngészőben.
-- **Javítás:** explicit Save Jira settings gomb + localStorage alapú per-project mentés (`releasegovernance.jiraSettings.<projectId>`), és mountkor visszatöltés.
-- **Megelőzés:** külső integrációs beállításoknál külön dönteni kell: ephemeral state vagy persisted state. Ha a felhasználó kézzel tokent/emailt ad meg, ne veszítsd el navigáció vagy refresh hatására.
-- **Ellenőrzés:** kézzel teszteld: beállítás megadása → Save → refresh → mezők újratöltődnek-e.
+# codingLessonsLearnt
 
-### [021] Jira lekérdezéseket mindig projektkulcshoz kell kötni a governed project szerint
-- **Tünet / log:** ugyanaz az Import Studio több projekten használható, ezért rossz Jira projektből is be lehetne húzni issue-kat.
-- **Kiváltó ok:** a Jira import URL-t elfogadta explicit governed-project enforcement nélkül.
-- **Javítás:** a selected project `jiraProjectKey` kötelező input lett az API-nak; issue/project/JQL import mind project-locked szűrőt kap.
-- **Megelőzés:** multi-project governance appban minden külső lekérdezést tenant/project contexthez kell kötni, nem elég a felhasználó által megadott URL-ben bízni.
-- **Ellenőrzés:** HOB projekt oldalon csak HOB issue-k jöhetnek vissza; SYN oldalon csak SYN; RLG oldalon csak RLG.
+Mindig ezzel kell kezdeni a fejlesztést: munka előtt olvasd végig ezt a fájlt elejétől a végéig. Az itt felsorolt hibákat nem szabad újra elkövetni. Minden új típusú hibát ehhez a fájlhoz kell hozzáappendelni, nem új fájlba írni, és nem szabad a régi tanulságokat törölni.
 
-### [022] Shared domain interface regresszió: UI már használ mezőt, de a közös típusból kikerül
-- **Tünet / log:** `Property 'backfillCandidates' does not exist on type 'ProjectRecord'.` build hiba az `app/projects/[projectId]/page.tsx` fájlban.
-- **Kiváltó ok:** a backfill feature több oldalon már a `project.backfillCandidates` mezőre épült, de a `lib/types.ts` aktuális `ProjectRecord` interfészéből ez a mező hiányzott.
-- **Javítás:** a `BackfillCandidate` interfészt és a `backfillCandidates?: BackfillCandidate[]` mezőt vissza kell vezetni a közös típusrétegbe.
-- **Megelőzés:** ha egy shared domain mezőt több képernyő is használ, minden type-only patch után ellenőrizni kell, hogy a `lib/types.ts` továbbra is tartalmazza-e a mezőt.
-- **Ellenőrzés:** keress rá a repo-ban a `backfillCandidates` használataira, és ellenőrizd, hogy a shared interface deklarálja-e a mezőt, mielőtt új buildet indítasz.
+Kötelező szerkezet minden új bejegyzésnél:
+- Tünet / log
+- Kiváltó ok
+- Javítás
+- Megelőzés
+- Ellenőrzés
+
+### [023] UI preview mezők és a shared import típus szétcsúszása
+- **Tünet / log:** `Property 'status' does not exist on type 'ImportedJiraIssue'.` hiba az `components/import-studio.tsx` fájlban, ugyanígy érintheti az `issueType`, `created`, `parentKey` mezőket is.
+- **Kiváltó ok:** a Jira test/import preview táblához új mezők kerültek be a UI-ba és/vagy API válaszba, de a közös `ImportedJiraIssue` interfész nem lett velük együtt bővítve.
+- **Javítás:** a shared típusrétegben (`lib/types.ts`) az `ImportedJiraIssue`-hoz hozzá kell adni az opcionális preview mezőket: `status`, `issueType`, `created`, `parentKey`.
+- **Megelőzés:** minden import-/preview-feature patchnél együtt kell kezelni a hármast: API route -> shared type -> UI consumer. Egyik sem változhat külön a másik kettő nélkül.
+- **Ellenőrzés:** keresd végig a repo-t `ImportedJiraIssue` használatokra és nézd meg, hogy a renderelt mezők mind szerepelnek-e az interfészben, mielőtt buildet indítasz.
+
+### [024] Ismétlődő shared-type regressziók
+- **Tünet / log:** sorozatban jelentkeztek hibák, ahol a UI már használt közös domain mezőket, de a shared type layer nem tartotta velük a lépést (`ProjectImportBundle`, `backfillCandidates`, `ImportedJiraIssue.status`).
+- **Kiváltó ok:** feature javítások során a shared contract ellenőrzés kimaradt.
+- **Javítás:** minden patch végén legyen kötelező shared-contract audit a módosított domain objektumokra.
+- **Megelőzés:** patch checklistbe vedd fel: "módosult-e shared interface?" és "minden consumer ugyanazt a canonical típust használja-e?".
+- **Ellenőrzés:** build előtt külön nézd át a `lib/types.ts`-t azokhoz az objektumokhoz, amelyek körül az adott hibajegy/patch mozgott.

@@ -22,6 +22,10 @@ export interface ImportedJiraIssue {
   labels: string[];
   url: string;
   source: "jira-url" | "jira-project" | "file-import";
+  status?: string;
+  issueType?: string;
+  created?: string;
+  parentKey?: string;
 }
 
 export interface IntegrationRef {
