@@ -9,23 +9,16 @@ Kötelező szerkezet minden új bejegyzésnél:
 - Megelőzés
 - Ellenőrzés
 
-### [028] Planned patch is not the same as downloadable patch
-- **Tünet / log:** a felhasználó jogosan jelezte, hogy csak egy felsorolást lát a módosítandó fájlokról, de nincs ténylegesen letölthető zip.
-- **Kiváltó ok:** a javítás meg volt tervezve, de a fájlok nem lettek ténylegesen legenerálva és átadva.
-- **Javítás:** a következő körben mindig ténylegesen generálni kell a módosított fájlokat és zipet.
-- **Megelőzés:** soha ne mondd, hogy kész a patch, ha a letölthető artifact még nem létezik.
-- **Ellenőrzés:** a válasz előtt mindig legyen konkrét sandbox link a zipre.
+### [031] Never import Node-only modules into code that can flow into client/page bundles
+- **Tünet / log:** Vercel build failed with `UnhandledSchemeError: Reading from "node:path" is not handled by plugins` and the import trace showed `./lib/runtime-control.ts -> ./components/app-shell.tsx -> ./app/projects/[projectId]/page.tsx`.
+- **Kiváltó ok:** a runtime-control helper `node:fs` és `node:path` importokat használt, miközben egy olyan komponensből volt importálva, ami page bundle-be került.
+- **Javítás:** a runtime-control olvasást build-safe, client-safe megoldásra kell cserélni. Ebben a fixben azonos szerkezetű embedded YAML stringből történik a parse, így nincs `node:` import a bundle útvonalon.
+- **Megelőzés:** minden új util/helper esetén az első kérdés legyen: bekerülhet-e közvetlenül vagy közvetve a kliensbundle-be? Ha igen, tilos `node:*`, `fs`, `path` vagy más server-only API használata.
+- **Ellenőrzés:** minden olyan fájlnál, amit komponens vagy page importál, futtasd végig fejben az import trace-t. Ha client/page útvonalra kerülhet, nem használhat Node-only modult.
 
-### [029] Jira import must support base URL + project key
-- **Tünet / log:** az import funkció minden projektben 0 issue-t adott vissza.
-- **Kiváltó ok:** a route túl sokat feltételezett a bemeneti Jira URL formátumáról, és nem kezelte stabilan a base URL + explicit project key használatot.
-- **Javítás:** a Jira import kapott erősített URL-parse + projectKey fallback logikát és többféle Jira keresési stratégiát.
-- **Megelőzés:** minden külső URL-alapú importnál biztosítani kell explicit, formátumtól független fallback paramétereket.
-- **Ellenőrzés:** teszteld külön issue URL-lel, project URL-lel, JQL URL-lel és sima base URL + project key kombinációval.
-
-### [030] Runtime-control documentation must be wired to runtime behavior
-- **Tünet / log:** a vezérlő YAML és a leírás elkészült, de a live oldalon nem látszott az új projekt-upload funkcionalitás.
-- **Kiváltó ok:** a dokumentációs/config réteg nem volt ténylegesen bekötve az UI-ba.
-- **Javítás:** a sidebar és az import wizard opciói most runtime-control olvasáson keresztül működnek.
-- **Megelőzés:** ha egy fájlról azt állítjuk, hogy vezérli a működést, azt legalább egy route vagy komponens ténylegesen olvassa is.
-- **Ellenőrzés:** módosítsd a runtime-control YAML egy látható elemét, majd ellenőrizd, hogy az UI reagál rá.
+### [032] Read the lessons file before each patch and classify the failure type first
+- **Tünet / log:** ugyanaz a hibatípus részben visszatért, pedig a lessons file már jelezte, hogy a patch csak akkor kész, ha ténylegesen build-safe.
+- **Kiváltó ok:** a javítás megtervezése megtörtént, de a `server-only vs client-safe` ellenőrzés nem volt elég szigorú a patch készítése előtt.
+- **Javítás:** a patch előtt explicit módon osztályozni kell a hibát: `syntax`, `types`, `server-only import`, `runtime regression`, `data regression`, stb.
+- **Megelőzés:** a lessons file-ból kötelező checklist legyen: 1) import trace ellenőrzés, 2) client/server boundary ellenőrzés, 3) minimális fix scope.
+- **Ellenőrzés:** mielőtt kiadsz patch-et, nézd meg, hogy a javított fájl importlánca tartalmaz-e Node-only modult.

@@ -1,5 +1,3 @@
-import fs from "node:fs";
-import path from "node:path";
 import YAML from "yaml";
 
 export type RuntimeControlItem = {
@@ -26,45 +24,76 @@ export type RuntimeControl = {
   };
 };
 
-const DEFAULT_RUNTIME_CONTROL: RuntimeControl = {
-  version: 1,
-  sidebar: {
-    showProjectSpecificNavigationOnlyWhenProjectSelected: true,
-    globalItems: [{ id: "projects", label: "Projects", href: "/projects" }],
-    projectItems: [
-      { id: "dashboard", label: "Dashboard", hrefTemplate: "/projects/{projectId}" },
-      { id: "releases", label: "Releases", hrefTemplate: "/projects/{projectId}/releases" },
-      { id: "capabilities", label: "Capabilities", hrefTemplate: "/projects/{projectId}/capabilities" },
-      { id: "integrations", label: "Integrations", hrefTemplate: "/projects/{projectId}/integrations" },
-      { id: "traceability", label: "Traceability", hrefTemplate: "/projects/{projectId}/traceability" },
-      { id: "automation", label: "Automation", hrefTemplate: "/projects/{projectId}/automation" },
-      { id: "import", label: "Import", hrefTemplate: "/projects/{projectId}/import" },
-    ],
-  },
-  projectUpload: {
-    enabled: true,
-    sources: ["markdown", "csv", "excel", "jira", "github", "hosting", "changelog"],
-    jira: { enabled: true, acceptedInputs: ["base-url-plus-project-key", "issue-url", "project-url", "jql-url"] },
-    github: { enabled: true, acceptedInputs: ["repository-url", "owner-repo"] },
-    hosting: { enabled: true, acceptedProviders: ["vercel", "supabase", "custom"] },
-    behaviors: {
-      jiraIssuesBecomeImportedJiraIssues: true,
-      jiraIssuesAlsoBecomeCapabilityCandidates: true,
-      githubAndHostingCanGenerateReleaseCandidates: true,
-      importedDataAppliesToCurrentProjectOnly: true,
-    },
-  },
-};
+const RUNTIME_CONTROL_YAML = `
+version: 1
+sidebar:
+  showProjectSpecificNavigationOnlyWhenProjectSelected: true
+  globalItems:
+    - id: projects
+      label: Projects
+      href: /projects
+  projectItems:
+    - id: dashboard
+      label: Dashboard
+      hrefTemplate: /projects/{projectId}
+    - id: releases
+      label: Releases
+      hrefTemplate: /projects/{projectId}/releases
+    - id: capabilities
+      label: Capabilities
+      hrefTemplate: /projects/{projectId}/capabilities
+    - id: integrations
+      label: Integrations
+      hrefTemplate: /projects/{projectId}/integrations
+    - id: traceability
+      label: Traceability
+      hrefTemplate: /projects/{projectId}/traceability
+    - id: automation
+      label: Automation
+      hrefTemplate: /projects/{projectId}/automation
+    - id: import
+      label: Import
+      hrefTemplate: /projects/{projectId}/import
+
+projectUpload:
+  enabled: true
+  sources:
+    - markdown
+    - csv
+    - excel
+    - jira
+    - github
+    - hosting
+    - changelog
+  jira:
+    enabled: true
+    acceptedInputs:
+      - base-url-plus-project-key
+      - issue-url
+      - project-url
+      - jql-url
+  github:
+    enabled: true
+    acceptedInputs:
+      - repository-url
+      - owner-repo
+  hosting:
+    enabled: true
+    acceptedProviders:
+      - vercel
+      - supabase
+      - custom
+  behaviors:
+    jiraIssuesBecomeImportedJiraIssues: true
+    jiraIssuesAlsoBecomeCapabilityCandidates: true
+    githubAndHostingCanGenerateReleaseCandidates: true
+    importedDataAppliesToCurrentProjectOnly: true
+`;
+
+const DEFAULT_RUNTIME_CONTROL: RuntimeControl = YAML.parse(RUNTIME_CONTROL_YAML) as RuntimeControl;
 
 export function getRuntimeControl(): RuntimeControl {
-  try {
-    const filePath = path.join(process.cwd(), "config", "releasegovernance-runtime-control.yaml");
-    const raw = fs.readFileSync(filePath, "utf-8");
-    const parsed = YAML.parse(raw) as RuntimeControl;
-    return parsed ?? DEFAULT_RUNTIME_CONTROL;
-  } catch {
-    return DEFAULT_RUNTIME_CONTROL;
-  }
+  return DEFAULT_RUNTIME_CONTROL;
 }
 
 export function resolveNavigation(projectId?: string) {
