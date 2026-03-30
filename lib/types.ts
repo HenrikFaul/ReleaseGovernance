@@ -22,6 +22,10 @@ export interface ImportedJiraIssue {
   labels: string[];
   url: string;
   source: "jira-url" | "jira-project" | "file-import";
+  status?: string;
+  issueType?: string;
+  created?: string;
+  parentKey?: string;
 }
 
 export interface IntegrationRef {
@@ -98,17 +102,6 @@ export interface ProjectOverview {
   runtimeNotes?: string[];
 }
 
-export interface BackfillCandidate {
-  id: string;
-  featureName: string;
-  summary: string;
-  description: string;
-  parent: string;
-  labels: string[] | string;
-  issueType: "Story" | "Task";
-  recommendedRelease?: string;
-}
-
 export interface ProjectRecord {
   id: string;
   tenantId: string;
@@ -124,7 +117,6 @@ export interface ProjectRecord {
   integrations: IntegrationRef[];
   parityAlerts: ParityAlert[];
   importedJiraIssues?: ImportedJiraIssue[];
-  backfillCandidates?: BackfillCandidate[];
   deploymentStatus: DeploymentStatus;
   overview?: ProjectOverview;
 }
