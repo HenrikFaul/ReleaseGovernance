@@ -29,17 +29,25 @@ export default function ReleasesPage({ params }: { params: { projectId: string }
     const tone = release.status === "current" ? "success" : release.status === "unreleased" ? "info" : "neutral";
 
     return (
-      <Link key={release.id} href={`/projects/${currentProject.id}/releases/${release.id}`} className="block rounded-2xl border border-slate-200 bg-white p-4 transition hover:border-slate-300 hover:bg-slate-50">
+      <Link
+        key={release.id}
+        href={`/projects/${currentProject.id}/releases/${release.id}`}
+        className="block rounded-2xl border border-slate-200 bg-white p-4 transition hover:border-slate-300 hover:bg-slate-50"
+      >
         <div className="grid gap-4 xl:grid-cols-[1.2fr,0.95fr,0.65fr,0.85fr,1.2fr,0.55fr,1.2fr,0.7fr]">
           <div>
             <div className="text-sm font-semibold text-slate-900">{release.version}</div>
             <div className="mt-1 flex flex-wrap gap-2">
-              {release.surfaces.map((surface) => <SurfaceBadge key={surface} surface={surface} />)}
+              {release.surfaces.map((surface) => (
+                <SurfaceBadge key={surface} surface={surface} />
+              ))}
             </div>
           </div>
           <div className="text-sm text-slate-600">
             <div className="font-medium text-slate-900">Status</div>
-            <div className="mt-1"><StatusBadge tone={tone as any}>{release.status ?? "old"}</StatusBadge></div>
+            <div className="mt-1">
+              <StatusBadge tone={tone as any}>{release.status ?? "old"}</StatusBadge>
+            </div>
           </div>
           <div className="text-sm text-slate-600">
             <div className="font-medium text-slate-900">Deploy date</div>
@@ -71,9 +79,13 @@ export default function ReleasesPage({ params }: { params: { projectId: string }
   };
 
   return (
-    <AppShell projectId={project.id} projectName={project.name}>
+    <AppShell projectId={currentProject.id}>
       <div className="space-y-6">
-        <SectionHeader eyebrow="Release center" title={`${project.name} releases`} description="Each row represents a governed release record. Open a row to inspect functionality, Jira traceability and cross-platform impact." />
+        <SectionHeader
+          eyebrow="Release center"
+          title={`${currentProject.name} releases`}
+          description="Each row represents a governed release record. Open a row to inspect functionality, Jira traceability and cross-platform impact."
+        />
         <section className="space-y-3">
           <div className="card p-4">
             <div className="grid gap-4 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500 xl:grid-cols-[1.2fr,0.95fr,0.65fr,0.85fr,1.2fr,0.55fr,1.2fr,0.7fr]">
@@ -94,7 +106,9 @@ export default function ReleasesPage({ params }: { params: { projectId: string }
           <section className="space-y-3">
             <div className="card p-5">
               <h3 className="text-lg font-semibold text-slate-900">Unreleased</h3>
-              <p className="mt-2 text-sm text-slate-600">Specified and imported items that are not yet deployed. These remain visible under the same release registry.</p>
+              <p className="mt-2 text-sm text-slate-600">
+                Specified and imported items that are not yet deployed. These remain visible under the same release registry.
+              </p>
             </div>
             {unreleased.map((release) => renderRow(release.id))}
           </section>

@@ -10,9 +10,13 @@ export default function AutomationPage({ params }: { params: { projectId: string
   const currentProject = project;
 
   return (
-    <AppShell projectId={currentProject.id} projectName={currentProject.name}>
+    <AppShell projectId={currentProject.id}>
       <div className="space-y-6">
-        <SectionHeader eyebrow="Automation" title={`${currentProject.name} starter governance kit`} description="Policy files, CI templates and automation rules that make governance enforceable instead of optional." />
+        <SectionHeader
+          eyebrow="Automation"
+          title={`${currentProject.name} starter governance kit`}
+          description="Policy files, CI templates and automation rules that make governance enforceable instead of optional."
+        />
         <div className="grid gap-4 md:grid-cols-2">
           <div className="card p-6">
             <h3 className="text-lg font-semibold text-slate-900">Starter files</h3>
