@@ -1,43 +1,137 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/app-shell";
-import { SectionHeader, StatCard, StatusBadge } from "@/components/ui";
-import { evaluateReleaseImpact } from "@/lib/impact-engine";
+import { SectionHeader, StatusBadge } from "@/components/ui";
 import { useProjectRecord } from "@/hooks/useProjectRecord";
+import { evaluateReleaseImpact } from "@/lib/impact-engine";
+import { readProjectSettings } from "@/lib/project-overrides";
+import { ReleaseCandidate } from "@/lib/types";
+
+function GroupStat({ label, value, helper }: { label: string; value: string; helper: string }) {
+  return (
+    <div className="rounded-3xl border border-slate-200 bg-white p-5">
+      <div className="text-sm text-slate-500">{label}</div>
+      <div className="mt-2 text-4xl font-semibold text-slate-950">{value}</div>
+      <div className="mt-3 text-sm leading-6 text-slate-500">{helper}</div>
+    </div>
+  );
+}
+
+function GroupSection({
+  title,
+  buttonLabel,
+  buttonHref,
+  children,
+}: {
+  title: string;
+  buttonLabel: string;
+  buttonHref: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="card p-6">
+      <div className="flex items-center justify-between gap-4">
+        <h3 className="text-xl font-semibold text-slate-950">{title}</h3>
+        <Link href={buttonHref} className="rounded-2xl bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">
+          {buttonLabel}
+        </Link>
+      </div>
+      <div className="mt-5">{children}</div>
+    </section>
+  );
+}
 
 export default function ProjectDashboardPage({ params }: { params: { projectId: string } }) {
   const { project } = useProjectRecord(params.projectId);
-  if (!project) return <AppShell projectId={params.projectId}><div className="card p-6">Project not found.</div></AppShell>;
+  const [autoCandidate, setAutoCandidate] = useState<ReleaseCandidate | null>(null);
+
+  const settings = useMemo(() => (project ? readProjectSettings(project.id) : {}), [project?.id]);
+
+  useEffect(() => {
+    if (!project?.repositories.web) return;
+    const repoUrl = settings.repoUrl ?? project.repositories.web;
+    if (!repoUrl || !String(repoUrl).includes("/")) return;
+    const latestReleaseDate = project.releases
+      .filter((release) => release.status !== "unreleased")
+      .map((release) => release.shippedAt)
+      .sort()
+      .at(-1);
+
+    fetch("/api/release-detection", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ projectId: project.id, repoUrl, latestReleaseDate }),
+    })
+      .then(async (res) => {
+        const data = await res.json();
+        if (res.ok) setAutoCandidate(data.candidate ?? null);
+      })
+      .catch(() => setAutoCandidate(null));
+  }, [project?.id, project?.repositories.web]);
+
+  if (!project) {
+    return (
+      <AppShell projectId={params.projectId}>
+        <div className="card p-6">Project not found.</div>
+      </AppShell>
+    );
+  }
 
   const deployedReleases = project.releases.filter((release) => release.status !== "unreleased");
   const unreleasedReleases = project.releases.filter((release) => release.status === "unreleased");
   const openAlerts = project.parityAlerts.filter((alert) => alert.state !== "resolved");
   const currentRelease = project.releases.find((release) => release.status === "current") ?? deployedReleases[0];
   const impact = currentRelease ? evaluateReleaseImpact(currentRelease) : null;
-  const backfillCount = project.backfillCandidates?.length ?? 0;
-  const candidateCount = project.releaseCandidates?.length ?? 0;
+  const backfillCount = project.backfillCandidates?.length ?? project.releases.filter((release) => release.jiraBackfillRequired).length;
+  const releaseCandidateCount = (project.releaseCandidates?.length ?? 0) + (autoCandidate ? 1 : 0);
 
   return (
-    <AppShell projectId={project.id} projectName={project.name}>
+    <AppShell projectId={project.id}>
       <div className="space-y-6">
-        <SectionHeader eyebrow="Project dashboard" title={project.name} description="Unified governance view across product surfaces, shared backend, integrations and delivery documentation." actions={<StatusBadge tone={project.deploymentStatus === "healthy" ? "success" : project.deploymentStatus === "warning" ? "warning" : "danger"}>{project.deploymentStatus}</StatusBadge>} />
+        <SectionHeader
+          eyebrow="Project dashboard"
+          title={project.name}
+          description="Unified governance view across product surfaces, shared backend, integrations and delivery documentation."
+          actions={
+            <StatusBadge tone={project.deploymentStatus === "healthy" ? "success" : project.deploymentStatus === "warning" ? "warning" : "danger"}>
+              {project.deploymentStatus}
+            </StatusBadge>
+          }
+        />
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-7">
-          <StatCard label="Tracked releases" value={String(deployedReleases.length)} helper="Deployed release rows" />
-          <StatCard label="Unreleased groups" value={String(unreleasedReleases.length)} helper="Specified but not yet deployed" />
-          <StatCard label="Capabilities" value={String(project.capabilities.length)} helper="Tracked independently from commits" />
-          <StatCard label="Open parity alerts" value={String(openAlerts.length)} helper="Cross-surface follow-up required" />
-          <StatCard label="Connected integrations" value={String(project.integrations.length)} helper="Source systems and external APIs" />
-          <StatCard label="Backfill candidates" value={String(backfillCount)} helper="Deployed without Jira" />
-          <StatCard label="Release candidates" value={String(candidateCount)} helper="Awaiting approval" />
-        </div>
+        <GroupSection title="Release dashboard" buttonLabel="Open release dashboard" buttonHref={`/projects/${project.id}/releases`}>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <GroupStat label="Tracked releases" value={String(deployedReleases.length)} helper="Deployed release rows" />
+            <GroupStat label="Unreleased groups" value={String(unreleasedReleases.length)} helper="Specified but not yet deployed" />
+            <GroupStat label="Backfill candidates" value={String(backfillCount)} helper="Deployed without Jira" />
+            <GroupStat label="Release candidates" value={String(releaseCandidateCount)} helper="Awaiting approval" />
+          </div>
+        </GroupSection>
+
+        <GroupSection title="Capabilities dashboard" buttonLabel="Open capabilities dashboard" buttonHref={`/projects/${project.id}/capabilities`}>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-2">
+            <GroupStat label="Capabilities" value={String(project.capabilities.length)} helper="Tracked independently from commits" />
+            <GroupStat label="Open parity alerts" value={String(openAlerts.length)} helper="Cross-surface follow-up required" />
+          </div>
+        </GroupSection>
+
+        <GroupSection title="Integrations dashboard" buttonLabel="Open integrations dashboard" buttonHref={`/projects/${project.id}/integrations`}>
+          <div className="grid gap-4 md:grid-cols-1 xl:grid-cols-1">
+            <GroupStat label="Connected integrations" value={String(project.integrations.length)} helper="Source systems and external APIs" />
+          </div>
+        </GroupSection>
 
         <div className="grid gap-6 xl:grid-cols-[1.15fr,0.85fr]">
           <section className="card p-6">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold text-slate-900">Current release posture</h3>
-              {currentRelease ? <StatusBadge tone={impact?.complianceStatus === "ready" ? "success" : impact?.complianceStatus === "needs-follow-up" ? "warning" : "danger"}>{currentRelease.status ?? "old"}</StatusBadge> : null}
+              {currentRelease ? (
+                <StatusBadge tone={impact?.complianceStatus === "ready" ? "success" : impact?.complianceStatus === "needs-follow-up" ? "warning" : "danger"}>
+                  {currentRelease.status ?? "old"}
+                </StatusBadge>
+              ) : null}
             </div>
             {currentRelease ? (
               <div className="mt-4 space-y-4 text-sm text-slate-700">
@@ -53,21 +147,33 @@ export default function ProjectDashboardPage({ params }: { params: { projectId: 
                   <li>Schema changed: {String(currentRelease.schemaChanged)}</li>
                   <li>Integrations touched: {currentRelease.integrationsChanged.join(", ") || "none"}</li>
                 </ul>
-                {impact ? <div className="rounded-2xl bg-slate-50 p-4"><div className="font-medium text-slate-900">Impact engine</div><p className="mt-2 text-slate-600">{impact.reasons.join(" ")}</p></div> : null}
-                <Link href={`/projects/${project.id}/releases/${currentRelease.id}`} className="inline-flex rounded-2xl bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700">Open release detail</Link>
+                {impact ? (
+                  <div className="rounded-2xl bg-slate-50 p-4">
+                    <div className="font-medium text-slate-900">Impact engine</div>
+                    <p className="mt-2 text-slate-600">{impact.reasons.join(" ")}</p>
+                  </div>
+                ) : null}
+                <Link href={`/projects/${project.id}/releases/${currentRelease.id}`} className="inline-flex rounded-2xl bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700">
+                  Open release detail
+                </Link>
               </div>
-            ) : <div className="mt-4 text-sm text-slate-500">No release records yet.</div>}
+            ) : (
+              <div className="mt-4 text-sm text-slate-500">No release records yet.</div>
+            )}
           </section>
 
           <section className="card p-6">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold text-slate-900">Open parity alerts</h3>
-              <Link href={`/projects/${project.id}/traceability`} className="text-sm font-medium">Traceability</Link>
+              <Link href={`/projects/${project.id}/capabilities`} className="text-sm font-medium">Capabilities</Link>
             </div>
             <div className="mt-4 space-y-3">
               {openAlerts.map((alert) => (
                 <div key={alert.id} className="rounded-2xl border border-slate-200 p-4">
-                  <div className="flex items-center justify-between gap-3"><div className="font-medium text-slate-900">{alert.sourceSurface} → {alert.affectedSurface}</div><StatusBadge tone={alert.severity === "critical" ? "danger" : alert.severity === "warning" ? "warning" : "info"}>{alert.severity}</StatusBadge></div>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="font-medium text-slate-900">{alert.sourceSurface} → {alert.affectedSurface}</div>
+                    <StatusBadge tone={alert.severity === "critical" ? "danger" : alert.severity === "warning" ? "warning" : "info"}>{alert.severity}</StatusBadge>
+                  </div>
                   <p className="mt-2 text-sm text-slate-600">{alert.reason}</p>
                   {alert.jiraKey ? <div className="mt-2 text-xs text-slate-500">Tracked in {alert.jiraKey}</div> : null}
                 </div>
@@ -75,27 +181,6 @@ export default function ProjectDashboardPage({ params }: { params: { projectId: 
             </div>
           </section>
         </div>
-
-        {project.releaseCandidates?.length ? (
-          <section className="card p-6">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-lg font-semibold text-slate-900">Pending release candidates</h3>
-                <p className="mt-2 text-sm text-slate-600">Fresh GitHub + hosting detections waiting for human approval.</p>
-              </div>
-              <Link href={`/projects/${project.id}/import`} className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Review in Import Studio</Link>
-            </div>
-            <div className="mt-4 space-y-3">
-              {project.releaseCandidates.map((candidate) => (
-                <div key={candidate.id} className="rounded-2xl border border-slate-200 p-4">
-                  <div className="font-medium text-slate-900">{candidate.version}</div>
-                  <div className="mt-2 text-sm text-slate-600">{candidate.releaseNotes}</div>
-                  <div className="mt-2 text-xs text-slate-500">Source: {candidate.source.label ?? candidate.repoUrl}</div>
-                </div>
-              ))}
-            </div>
-          </section>
-        ) : null}
       </div>
     </AppShell>
   );

@@ -1,115 +1,66 @@
 import { NextRequest, NextResponse } from "next/server";
-import { parseJiraUrl } from "@/lib/jira-import";
 
-type Draft = {
-  id: string;
-  summary: string;
-  description: string;
-  labels: string[];
-  issueType: string;
-  parentKey?: string;
-};
-
-function authHeader(email: string, token: string) {
-  return `Basic ${Buffer.from(`${email}:${token}`).toString("base64")}`;
+function parseBaseJiraUrl(raw: string) {
+  const url = new URL(raw);
+  return `${url.protocol}//${url.host}`;
 }
 
-function toAdf(description: string) {
-  const lines = description.split(/\r?\n/);
-  const content = [];
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed) {
-      content.push({ type: "paragraph", content: [] });
-      continue;
-    }
-    content.push({
-      type: "paragraph",
-      content: [{ type: "text", text: trimmed }],
-    });
-  }
-
+function jiraDescriptionDocument(text: string) {
   return {
-    version: 1,
     type: "doc",
-    content,
+    version: 1,
+    content: text.split(/\n\n+/).map((paragraph) => ({
+      type: "paragraph",
+      content: [{ type: "text", text: paragraph.slice(0, 32000) }],
+    })),
   };
 }
 
-async function createIssue(base: string, email: string, token: string, payload: Record<string, unknown>) {
+async function jiraCreateIssue(base: string, email: string, apiToken: string, payload: any) {
+  const auth = Buffer.from(`${email}:${apiToken}`).toString("base64");
   const res = await fetch(`${base}/rest/api/3/issue`, {
     method: "POST",
     headers: {
-      Authorization: authHeader(email, token),
+      Authorization: `Basic ${auth}`,
       Accept: "application/json",
       "Content-Type": "application/json",
     },
     body: JSON.stringify(payload),
     cache: "no-store",
   });
-
   const data = await res.json().catch(() => ({}));
-  return { ok: res.ok, status: res.status, data };
+  if (!res.ok) throw new Error(data.errorMessages?.join(" ") || `Jira create failed (${res.status})`);
+  return data;
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const parsed = parseJiraUrl(body.jiraUrl);
-    const projectKey = String(body.projectKey ?? "").toUpperCase();
-    const email = String(body.jiraEmail ?? "");
-    const token = String(body.jiraToken ?? "");
-    const drafts: Draft[] = Array.isArray(body.drafts) ? body.drafts : [];
-
-    if (!projectKey || !email || !token) {
-      return NextResponse.json({ error: "projectKey, jiraEmail and jiraToken are required." }, { status: 400 });
+    const { jiraUrl, email, apiToken, projectKey, drafts } = await request.json();
+    if (!jiraUrl || !email || !apiToken || !projectKey) {
+      return NextResponse.json({ error: "jiraUrl, email, apiToken and projectKey are required." }, { status: 400 });
+    }
+    if (!Array.isArray(drafts) || !drafts.length) {
+      return NextResponse.json({ error: "No Jira drafts supplied." }, { status: 400 });
     }
 
+    const base = parseBaseJiraUrl(jiraUrl);
     const created = [];
-    const failed = [];
 
     for (const draft of drafts) {
-      const fields: Record<string, unknown> = {
+      const fields: any = {
         project: { key: projectKey },
         summary: draft.summary,
+        description: jiraDescriptionDocument(draft.description),
         issuetype: { name: draft.issueType || "Story" },
         labels: draft.labels ?? [],
-        description: toAdf(draft.description ?? ""),
       };
-
-      if (draft.parentKey) {
-        fields.parent = { key: draft.parentKey };
-      }
-
-      let result = await createIssue(parsed.base, email, token, { fields });
-
-      if (!result.ok && draft.parentKey) {
-        const retryFields = { ...fields };
-        delete retryFields.parent;
-        result = await createIssue(parsed.base, email, token, { fields: retryFields });
-      }
-
-      if (result.ok) {
-        created.push({
-          id: draft.id,
-          key: result.data.key,
-          self: result.data.self,
-        });
-      } else {
-        failed.push({
-          id: draft.id,
-          summary: draft.summary,
-          status: result.status,
-          error: result.data,
-        });
-      }
+      if (draft.parentKey) fields.parent = { key: draft.parentKey };
+      const data = await jiraCreateIssue(base, email, apiToken, { fields });
+      created.push({ key: data.key, id: data.id, self: data.self, sourceReleaseVersion: draft.releaseVersion });
     }
 
-    return NextResponse.json({ created, failed });
+    return NextResponse.json({ created });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Push-to-Jira apply failed." },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Push to Jira apply failed." }, { status: 500 });
   }
 }

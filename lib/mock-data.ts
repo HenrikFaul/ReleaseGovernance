@@ -132,14 +132,13 @@ const syncfolkProject: ProjectRecord = {
   ]
 };
 
-
 const releaseGovernanceProject: ProjectRecord = {
   id: "project_release_governance",
   tenantId: "tenant_releasegovernance",
   name: "ReleaseGovernance",
   slug: "releasegovernance",
   description: "Governance cockpit used to track releases, Jira traceability and delivery posture for Hobbeast, Syncfolk and future projects.",
-  domain: "internal.releasegovernance",
+  domain: "releasegovernance.dev",
   repositories: { web: "HenrikFaul/ReleaseGovernance" },
   jiraProjectKey: "RLG",
   deploymentStatus: "warning",
@@ -147,8 +146,8 @@ const releaseGovernanceProject: ProjectRecord = {
     {
       id: "rel-rg-web-0-1-0",
       version: "web-v0.1.0",
-      status: "current",
       releaseState: "released",
+      status: "current",
       surfaces: ["web", "backend", "shared-contract"],
       shippedAt: "2026-03-28",
       backendChanged: true,
@@ -156,237 +155,97 @@ const releaseGovernanceProject: ProjectRecord = {
       schemaChanged: true,
       integrationsChanged: ["github", "jira", "vercel", "supabase"],
       jiraBackfillRequired: false,
-      deliveredCapabilities: [
-        "rg_workspace_shell",
-        "rg_dashboard_release_center",
-        "rg_release_detail_traceability",
-        "rg_impact_engine",
-        "rg_integrations_hub",
-        "rg_governance_starter_kit"
-      ],
+      deliveredCapabilities: ["workspace_shell", "release_registry", "jira_traceability", "integration_registry"],
       releaseNotes: "Initial ReleaseGovernance MVP with workspace shell, project registry, release center, traceability, integrations hub, impact logic and starter governance kit.",
-      jiraLinks: [
-        { key: "RLG-6", summary: "Build authenticated workspace and project selection shell", status: "To Do", url: "https://hobbeast.atlassian.net/browse/RLG-6" },
-        { key: "RLG-7", summary: "Build project dashboard with release center, capability registry and parity alerts", status: "To Do", url: "https://hobbeast.atlassian.net/browse/RLG-7" },
-        { key: "RLG-8", summary: "Build release detail view with surfaces, backend impact and Jira traceability", status: "To Do", url: "https://hobbeast.atlassian.net/browse/RLG-8" },
-        { key: "RLG-9", summary: "Implement impact engine and parity recommendation logic", status: "To Do", url: "https://hobbeast.atlassian.net/browse/RLG-9" },
-        { key: "RLG-10", summary: "Build integrations hub for GitHub, Jira, Vercel, Supabase and Lovable references", status: "To Do", url: "https://hobbeast.atlassian.net/browse/RLG-10" },
-        { key: "RLG-11", summary: "Ship release-impact standard, capability registry schema and starter automation templates", status: "To Do", url: "https://hobbeast.atlassian.net/browse/RLG-11" }
-      ],
-      source: {
-        kind: "github",
-        owner: "HenrikFaul",
-        repository: "ReleaseGovernance",
-        label: "GitHub / HenrikFaul/ReleaseGovernance"
+      deploymentComment: "MVP shipped with seeded governance data and static traceability coverage.",
+      changelog: {
+        title: "0.1.0-mvp",
+        excerpt: [
+          "Multi-tenant B2B web application shell for ReleaseGovernance.",
+          "Project dashboard with release center, capability summary, parity alerts and integrations visibility.",
+          "Release detail view, capability registry, integrations hub, traceability view and automation starter kit."
+        ]
       },
-      deploymentComment: "MVP shipped with seeded governance data and static traceability coverage."
+      jiraLinks: [
+        { key: "RLG-1", summary: "ReleaseGovernance MVP shell", status: "Tracked", url: "https://hobbeast.atlassian.net/browse/RLG-1" },
+        { key: "RLG-2", summary: "Seeded release registry and static project data", status: "Tracked", url: "https://hobbeast.atlassian.net/browse/RLG-2" },
+        { key: "RLG-3", summary: "Initial import and Jira traceability surfaces", status: "Tracked", url: "https://hobbeast.atlassian.net/browse/RLG-3" }
+      ],
+      source: { kind: "github", owner: "HenrikFaul", repository: "ReleaseGovernance", ref: "main", label: "GitHub / HenrikFaul/ReleaseGovernance" }
     },
     {
       id: "rel-rg-platform-0-2-0",
       version: "platform-v0.2.0",
-      status: "unreleased",
       releaseState: "unreleased",
+      status: "unreleased",
       surfaces: ["web", "backend", "shared-contract"],
       shippedAt: "planned",
       backendChanged: true,
       sharedContractChanged: true,
-      schemaChanged: true,
-      integrationsChanged: ["github", "jira", "vercel", "supabase"],
+      schemaChanged: false,
+      integrationsChanged: ["jira", "github", "vercel"],
       jiraBackfillRequired: false,
-      deliveredCapabilities: ["rg_live_ingestion", "rg_supabase_persistence", "rg_release_ops_blocking"],
-      releaseNotes: "Planned live ingestion, persisted governance storage and stricter release operations.",
+      deliveredCapabilities: ["runtime_project_upload", "release_detection", "push_to_jira"],
+      releaseNotes: "Planned release train for runtime project upload, auto release detection and Jira push workflows.",
+      deploymentComment: "Backlog cluster not yet deployed.",
+      changelog: {
+        title: "planned platform-v0.2.0",
+        excerpt: [
+          "Workspace-level new project bootstrap.",
+          "Runtime project upload with Jira, GitHub and hosting preview.",
+          "Release detection and governed Jira push workflow."
+        ]
+      },
       jiraLinks: [
-        { key: "RLG-1", summary: "Epic: Governance platform foundation and tenant/project model", status: "To Do", url: "https://hobbeast.atlassian.net/browse/RLG-1" },
-        { key: "RLG-4", summary: "Epic: External integrations, ingestion and deployment visibility", status: "To Do", url: "https://hobbeast.atlassian.net/browse/RLG-4" },
-        { key: "RLG-5", summary: "Epic: Policy files, automation templates and release operations", status: "To Do", url: "https://hobbeast.atlassian.net/browse/RLG-5" }
+        { key: "RLG-4", summary: "Live release ingestion and parity automation", status: "Open", url: "https://hobbeast.atlassian.net/browse/RLG-4" },
+        { key: "RLG-5", summary: "Project upload runtime flow", status: "Open", url: "https://hobbeast.atlassian.net/browse/RLG-5" },
+        { key: "RLG-6", summary: "Push to Jira approval workflow", status: "Open", url: "https://hobbeast.atlassian.net/browse/RLG-6" }
       ],
-      source: { kind: "manual", label: "Planned release train" },
-      deploymentComment: "Backlog cluster not yet deployed."
+      source: { kind: "manual", label: "Planned release train" }
     }
   ],
   capabilities: [
-    {
-      id: "rg_workspace_shell",
-      name: "Authenticated workspace and project shell",
-      description: "Login placeholder, signed-in shell, workspace card view and generic project navigation.",
-      statusBySurface: { web: "shipped", backend: "partial", "shared-contract": "partial" },
-      parityStatus: "aligned",
-      integrations: ["github", "jira"],
-      jiraKeys: ["RLG-1", "RLG-6"],
-      firstRelease: { web: "web-v0.1.0" },
-      source: "seed"
-    },
-    {
-      id: "rg_dashboard_release_center",
-      name: "Project dashboard and release center",
-      description: "Project dashboard cards, release registry, delivery posture summary and parity alerts overview.",
-      statusBySurface: { web: "shipped", backend: "partial", "shared-contract": "partial" },
-      parityStatus: "aligned",
-      integrations: ["jira", "vercel"],
-      jiraKeys: ["RLG-3", "RLG-7"],
-      firstRelease: { web: "web-v0.1.0" },
-      source: "seed"
-    },
-    {
-      id: "rg_release_detail_traceability",
-      name: "Release detail, changelog and Jira traceability",
-      description: "Release detail page with surface flags, linked Jira work, delivered capabilities and changelog-backed notes.",
-      statusBySurface: { web: "shipped", backend: "partial", "shared-contract": "shipped" },
-      parityStatus: "aligned",
-      integrations: ["jira"],
-      jiraKeys: ["RLG-3", "RLG-8"],
-      firstRelease: { web: "web-v0.1.0", "shared-contract": "web-v0.1.0" },
-      source: "seed"
-    },
-    {
-      id: "rg_impact_engine",
-      name: "Impact engine and parity recommendations",
-      description: "Rules that infer affected surfaces and release readiness from backend, contract, schema and integration changes.",
-      statusBySurface: { web: "shipped", backend: "shipped", "shared-contract": "shipped" },
-      parityStatus: "aligned",
-      integrations: ["jira", "supabase", "vercel"],
-      jiraKeys: ["RLG-2", "RLG-9"],
-      firstRelease: { web: "web-v0.1.0", backend: "web-v0.1.0" },
-      source: "seed"
-    },
-    {
-      id: "rg_integrations_hub",
-      name: "Integrations hub",
-      description: "Governed catalog of GitHub, Jira, Vercel, Supabase, Lovable and external API references.",
-      statusBySurface: { web: "shipped", backend: "partial" },
-      parityStatus: "follow-up-required",
-      integrations: ["github", "jira", "vercel", "supabase", "lovable"],
-      jiraKeys: ["RLG-4", "RLG-10"],
-      firstRelease: { web: "web-v0.1.0" },
-      source: "seed"
-    },
-    {
-      id: "rg_governance_starter_kit",
-      name: "Governance starter kit",
-      description: "Starter operating model, starter file list and policy guidance that customer projects can adopt.",
-      statusBySurface: { web: "shipped", "shared-contract": "partial" },
-      parityStatus: "follow-up-required",
-      integrations: ["github", "jira"],
-      jiraKeys: ["RLG-5", "RLG-11"],
-      firstRelease: { web: "web-v0.1.0" },
-      source: "seed"
-    },
-    {
-      id: "rg_live_ingestion",
-      name: "Live toolchain ingestion and deployment visibility",
-      description: "Direct ingestion of GitHub, Jira, Vercel and Supabase state instead of only seeded/static references.",
-      statusBySurface: { web: "planned", backend: "planned", "shared-contract": "planned" },
-      parityStatus: "planned",
-      integrations: ["github", "jira", "vercel", "supabase"],
-      jiraKeys: ["RLG-4"],
-      firstRelease: { web: "platform-v0.2.0" },
-      source: "seed"
-    },
-    {
-      id: "rg_supabase_persistence",
-      name: "Persisted governance storage and tenant model hardening",
-      description: "Move project governance data from seed-only state toward persisted Supabase tables and stronger tenant separation.",
-      statusBySurface: { web: "planned", backend: "planned", "shared-contract": "planned" },
-      parityStatus: "planned",
-      integrations: ["supabase"],
-      jiraKeys: ["RLG-1", "RLG-4"],
-      firstRelease: { web: "platform-v0.2.0", backend: "platform-v0.2.0" },
-      source: "seed"
-    },
-    {
-      id: "rg_release_ops_blocking",
-      name: "Release operations and CI enforcement",
-      description: "Governance validation, CODEOWNERS, release operations templates and release-readiness blocking rules.",
-      statusBySurface: { web: "planned", backend: "planned", "shared-contract": "planned" },
-      parityStatus: "planned",
-      integrations: ["github", "jira"],
-      jiraKeys: ["RLG-5"],
-      firstRelease: { web: "platform-v0.2.0" },
-      source: "seed"
-    }
+    { id: "workspace_shell", name: "Workspace shell", description: "Project picker, dashboard shell and scoped governance context.", statusBySurface: { web: "shipped", backend: "partial" }, parityStatus: "planned", integrations: ["github", "jira"], jiraKeys: ["RLG-1"] },
+    { id: "release_registry", name: "Release registry", description: "Tracked releases and unreleased groups with cross-platform posture.", statusBySurface: { web: "shipped", backend: "partial", "shared-contract": "partial" }, parityStatus: "planned", integrations: ["github", "vercel"], jiraKeys: ["RLG-2"] },
+    { id: "jira_traceability", name: "Jira traceability", description: "Release-to-Jira mapping, imported Jira issue visibility and governance linkage.", statusBySurface: { web: "shipped", backend: "partial" }, parityStatus: "planned", integrations: ["jira"], jiraKeys: ["RLG-3"] },
+    { id: "integration_registry", name: "Integration registry", description: "Connected toolchain and API registry for governed products.", statusBySurface: { web: "shipped" }, parityStatus: "aligned", integrations: ["github", "jira", "vercel", "supabase"], jiraKeys: ["RLG-3"] },
+    { id: "runtime_project_upload", name: "Runtime project upload", description: "Workspace-level new project onboarding with preview and apply flow.", statusBySurface: { web: "planned", backend: "planned" }, parityStatus: "planned", integrations: ["jira", "github", "vercel", "supabase"], jiraKeys: ["RLG-5"] },
+    { id: "release_detection", name: "Automatic release detection", description: "Generate release candidate rows from recent GitHub commits, changelog content and deployment reachability.", statusBySurface: { web: "planned", backend: "planned", "shared-contract": "planned" }, parityStatus: "follow-up-required", integrations: ["github", "vercel"], jiraKeys: ["RLG-4"] },
+    { id: "push_to_jira", name: "Push to Jira", description: "Suggest and apply Jira issue creation/update from selected deploy rows with editable preview.", statusBySurface: { web: "planned", backend: "planned" }, parityStatus: "planned", integrations: ["jira"], jiraKeys: ["RLG-6"] }
   ],
   integrations: [
-    { id: "github", name: "GitHub", category: "source-control", state: "connected", notes: "Repository metadata and source references are represented in the current MVP." },
-    { id: "jira", name: "Jira", category: "planning", state: "connected", notes: "RLG Jira export is matched against delivered and planned capabilities." },
-    { id: "vercel", name: "Vercel", category: "deployment", state: "attention", notes: "Deployment visibility is modelled, but live deployment sync is not wired yet." },
-    { id: "supabase", name: "Supabase", category: "backend", state: "attention", environmentSensitive: true, notes: "Persistence target for governance data, but not yet the active source of truth." },
-    { id: "lovable", name: "Lovable", category: "design", state: "connected", notes: "Used as a design/prototyping reference for some related projects." },
-    { id: "markdown-changelog", name: "CHANGELOG.md", category: "documentation", state: "connected", notes: "Release detail pages read release-specific notes from the repository changelog file." }
+    { id: "github", name: "GitHub", category: "source-control", state: "connected", notes: "ReleaseGovernance repo is the current code source." },
+    { id: "jira", name: "Jira", category: "planning", state: "connected", notes: "RLG project tracks ReleaseGovernance backlog and traceability." },
+    { id: "vercel", name: "Vercel", category: "deployment", state: "connected", notes: "Deployment surface used for ReleaseGovernance hosting." },
+    { id: "supabase", name: "Supabase", category: "backend", state: "planned", environmentSensitive: true, notes: "Planned live governance persistence backend." },
+    { id: "markdown", name: "Markdown inventories", category: "documentation", state: "connected", notes: "Project bootstrap and release narratives can be imported from Markdown." },
+    { id: "excel", name: "Excel / CSV imports", category: "documentation", state: "connected", notes: "Canonical import templates are available for structured project intake." }
   ],
   parityAlerts: [
-    {
-      id: "rg-alert-1",
-      severity: "warning",
-      sourceSurface: "web",
-      affectedSurface: "backend",
-      reason: "The integrations hub is present, but live backend ingestion and persisted governance records are still backlog items.",
-      jiraKey: "RLG-4",
-      state: "open"
-    },
-    {
-      id: "rg-alert-2",
-      severity: "warning",
-      sourceSurface: "shared-contract",
-      affectedSurface: "web",
-      reason: "Starter governance templates are surfaced in the UI, but CI-enforced release operations and CODEOWNERS-style controls are not yet active.",
-      jiraKey: "RLG-5",
-      state: "tracked"
-    }
-  ],
-  importedJiraIssues: [
-    { id: "rlg-import-1", key: "RLG-1", summary: "Epic: Governance platform foundation and tenant/project model", description: "Build the multi-tenant foundation of ReleaseGovernance as a reusable B2B web application.", labels: ["epic", "releasegovernance", "foundation", "unreleased"], url: "https://hobbeast.atlassian.net/browse/RLG-1", source: "file-import" },
-    { id: "rlg-import-2", key: "RLG-2", summary: "Epic: Impact engine, parity alerts and governance compliance", description: "Build the decision engine that determines cross-surface impact and compliance state.", labels: ["epic", "releasegovernance", "impact-engine", "released"], url: "https://hobbeast.atlassian.net/browse/RLG-2", source: "file-import" },
-    { id: "rlg-import-3", key: "RLG-3", summary: "Epic: Release center, capability registry and traceability", description: "Build the main governance surfaces that show what was shipped, where, and why.", labels: ["epic", "releasegovernance", "traceability", "released"], url: "https://hobbeast.atlassian.net/browse/RLG-3", source: "file-import" },
-    { id: "rlg-import-4", key: "RLG-4", summary: "Epic: External integrations, ingestion and deployment visibility", description: "Integrate the external systems ReleaseGovernance depends on and expose their state in one product surface.", labels: ["epic", "releasegovernance", "integrations", "unreleased"], url: "https://hobbeast.atlassian.net/browse/RLG-4", source: "file-import" },
-    { id: "rlg-import-5", key: "RLG-5", summary: "Epic: Policy files, automation templates and release operations", description: "Ship the governance operating model together with the product.", labels: ["epic", "releasegovernance", "automation", "unreleased"], url: "https://hobbeast.atlassian.net/browse/RLG-5", source: "file-import" },
-    { id: "rlg-import-6", key: "RLG-6", summary: "Story: Build authenticated workspace and project selection shell", description: "Create the initial signed-in experience for ReleaseGovernance.", labels: ["story", "releasegovernance", "foundation", "released"], url: "https://hobbeast.atlassian.net/browse/RLG-6", source: "file-import" },
-    { id: "rlg-import-7", key: "RLG-7", summary: "Story: Build project dashboard with release center, capability registry and parity alerts", description: "Create the main project dashboard surface.", labels: ["story", "releasegovernance", "dashboard", "released"], url: "https://hobbeast.atlassian.net/browse/RLG-7", source: "file-import" },
-    { id: "rlg-import-8", key: "RLG-8", summary: "Story: Build release detail view with surfaces, backend impact and Jira traceability", description: "Create the release detail workflow.", labels: ["story", "releasegovernance", "release-detail", "released"], url: "https://hobbeast.atlassian.net/browse/RLG-8", source: "file-import" },
-    { id: "rlg-import-9", key: "RLG-9", summary: "Story: Implement impact engine and parity recommendation logic", description: "Build the core rules engine for change impact.", labels: ["story", "releasegovernance", "impact-engine", "released"], url: "https://hobbeast.atlassian.net/browse/RLG-9", source: "file-import" },
-    { id: "rlg-import-10", key: "RLG-10", summary: "Story: Build integrations hub for GitHub, Jira, Vercel, Supabase and Lovable references", description: "Create the project integrations screen.", labels: ["story", "releasegovernance", "integrations", "released"], url: "https://hobbeast.atlassian.net/browse/RLG-10", source: "file-import" },
-    { id: "rlg-import-11", key: "RLG-11", summary: "Story: Ship release-impact standard, capability registry schema and starter automation templates", description: "Create the governance starter kit that customer projects will adopt.", labels: ["story", "releasegovernance", "automation", "released"], url: "https://hobbeast.atlassian.net/browse/RLG-11", source: "file-import" }
+    { id: "rg-alert-1", severity: "warning", sourceSurface: "web", affectedSurface: "backend", reason: "The integrations hub is present, but live backend ingestion and persisted governance records are still backlog items.", jiraKey: "RLG-4", state: "open" },
+    { id: "rg-alert-2", severity: "warning", sourceSurface: "web", affectedSurface: "shared-contract", reason: "Project upload and push-to-Jira workflows need shared governance contract stabilization before they can be treated as fully released.", jiraKey: "RLG-6", state: "tracked" }
   ],
   backfillCandidates: [
-    {
-      id: "rg-backfill-001",
-      featureName: "Local override and merge engine",
-      summary: "Backfill story: Track local override and merge engine for imported governance data",
-      description: "The application already merges seeded project records with locally imported override data so new Jira, release and capability imports can be layered on top of the baseline dataset without overwriting the seed. This shipped behavior needs a formal Jira story for auditability.",
-      parent: "RLG-3",
-      labels: ["releasegovernance", "backfill", "rg-backfill-001"],
-      issueType: "Story",
-      recommendedRelease: "web-v0.1.0"
-    },
-    {
-      id: "rg-backfill-002",
-      featureName: "Seeded cross-project governance dataset",
-      summary: "Backfill story: Capture seeded cross-project governance dataset and release grouping heuristics",
-      description: "The product already ships with seeded governance coverage for Hobbeast and Syncfolk, including release grouping and capability mapping heuristics. Because this behavior is visible in the running product, a dedicated Jira story should be created and linked retroactively.",
-      parent: "RLG-1",
-      labels: ["releasegovernance", "backfill", "rg-backfill-002"],
-      issueType: "Story",
-      recommendedRelease: "web-v0.1.0"
-    },
-    {
-      id: "rg-backfill-003",
-      featureName: "Changelog-backed release notes viewer",
-      summary: "Backfill story: Track changelog-backed release notes surfaced on release detail pages",
-      description: "Release detail pages now resolve release-specific notes directly from CHANGELOG.md so project owners can inspect a release and see the matching changelog entry in-context. This deployed feature was not matched to an existing Jira ticket and should receive one.",
-      parent: "RLG-3",
-      labels: ["releasegovernance", "backfill", "rg-backfill-003"],
-      issueType: "Story",
-      recommendedRelease: "web-v0.1.0"
-    }
+    { id: "rg-backfill-1", featureName: "Release dashboard grouping", summary: "Backfill Jira story for grouped dashboard release tiles", description: "Dashboard should group release-focused counts and open actions into one governed release dashboard section.", parent: "RLG-1", labels: ["surface:web", "governance", "dashboard"], issueType: "Story", recommendedRelease: "platform-v0.2.0" },
+    { id: "rg-backfill-2", featureName: "Capabilities dashboard grouping", summary: "Backfill Jira story for grouped capability dashboard", description: "Capabilities and parity alerts should be presented as a grouped dashboard section with a common entry action.", parent: "RLG-1", labels: ["surface:web", "governance", "capabilities"], issueType: "Story", recommendedRelease: "platform-v0.2.0" },
+    { id: "rg-backfill-3", featureName: "Push to Jira preview", summary: "Backfill Jira story for Push to Jira preview workflow", description: "Selected release rows should generate editable Jira suggestions before apply.", parent: "RLG-6", labels: ["surface:web", "jira", "automation"], issueType: "Story", recommendedRelease: "platform-v0.2.0" }
+  ],
+  releaseCandidates: [],
+  importedJiraIssues: [
+    { id: "rg-import-1", key: "RLG-1", summary: "ReleaseGovernance MVP shell", description: "Workspace shell and baseline governance cockpit.", labels: ["surface:web", "governance"], url: "https://hobbeast.atlassian.net/browse/RLG-1", source: "file-import" },
+    { id: "rg-import-2", key: "RLG-4", summary: "Live release ingestion and parity automation", description: "Automatic release candidate generation from commit and deployment metadata.", labels: ["surface:web", "surface:backend", "impact:shared-contract"], url: "https://hobbeast.atlassian.net/browse/RLG-4", source: "file-import" },
+    { id: "rg-import-3", key: "RLG-6", summary: "Push to Jira approval workflow", description: "Preview and apply governed Jira issue creation from deploy rows.", labels: ["surface:web", "jira"], url: "https://hobbeast.atlassian.net/browse/RLG-6", source: "file-import" }
   ],
   overview: {
-    applicationDescription: "Internal governance cockpit that lets a product owner track what shipped, which Jira work items it came from, where cross-surface follow-up is needed, and which governance gaps still require backfill.",
-    techStack: ["Next.js App Router", "React", "TypeScript", "Tailwind CSS", "Seeded governance records", "Optional local import overrides"],
-    hostingServices: ["Vercel-style web deployment target", "Static governance file storage in repository"],
-    backendServices: ["Impact engine rules", "Local override merge logic", "Planned Supabase persistence"],
-    projectStructure: ["app/projects for project-specific pages", "lib/mock-data.ts as the current seed source of truth", "governance/ for starter schema and registry standards", "hooks/useProjectRecord.ts for mergeable runtime state"],
-    runtimeNotes: ["The current MVP is data-seeded first and only partially live-integrated.", "Release detail pages can surface project-specific changelog entries from CHANGELOG.md."]
+    applicationDescription: "Governance cockpit used to coordinate release posture, Jira traceability and multi-project delivery control.",
+    techStack: ["Next.js 14", "React", "TypeScript", "Tailwind CSS"],
+    hostingServices: ["Vercel"],
+    backendServices: ["Planned Supabase governance backend"],
+    projectStructure: ["Workspace shell", "Project dashboards", "Release registry", "Import and automation surfaces"],
+    runtimeNotes: ["Current state mixes seeded governance data with manually curated release and Jira mappings."]
   }
 };
+
 
 
 export const tenants: TenantRecord[] = [{ id: "tenant_releasegovernance", name: "ReleaseGovernance Demo Workspace", plan: "growth", projects: [hobbeastProject, syncfolkProject, releaseGovernanceProject] }];

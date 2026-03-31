@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { parseLatestProjectChangelog } from "@/lib/changelog";
+import { ReleaseCandidate, ReleaseChangelog, Surface } from "@/lib/types";
 
-function parseGitHubRepoUrl(raw: string) {
+function parseRepo(raw: string) {
   const trimmed = raw.trim();
   if (/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(trimmed)) {
     const [owner, repo] = trimmed.replace(/\.git$/, "").split("/");
@@ -13,128 +13,106 @@ function parseGitHubRepoUrl(raw: string) {
   return { owner: parts[0], repo: parts[1] };
 }
 
-async function githubFetch(url: string, token: string) {
-  const res = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/vnd.github+json",
-      "User-Agent": "releasegovernance",
-    },
-    cache: "no-store",
-  });
-  if (!res.ok) throw new Error(`GitHub request failed (${res.status})`);
-  return res.json();
-}
-
-async function fetchRepoFile(owner: string, repo: string, filePath: string, token: string, ref?: string) {
-  try {
-    const suffix = ref ? `?ref=${encodeURIComponent(ref)}` : "";
-    const data: any = await githubFetch(`https://api.github.com/repos/${owner}/${repo}/contents/${filePath}${suffix}`, token);
-    if (data.content) return Buffer.from(String(data.content).replace(/\n/g, ""), "base64").toString("utf8");
-  } catch {}
-  return "";
-}
-
-function extractJiraKeys(text: string, projectKey?: string) {
-  const matches = Array.from(new Set(text.match(/\b[A-Z][A-Z0-9]+-\d+\b/g) ?? []));
-  if (!projectKey) return matches;
-  return matches.filter((key) => key.startsWith(`${projectKey.toUpperCase()}-`));
-}
-
-function detectSurfaces(repoUrl: string, hostingProvider: string, combinedText: string) {
-  const text = `${repoUrl} ${combinedText}`.toLowerCase();
-  const surfaces = new Set<string>();
-  if (text.includes("android") || repoUrl.toLowerCase().includes("mobile")) surfaces.add("mobile-android");
-  else surfaces.add("web");
-  if (hostingProvider === "supabase" || text.includes("supabase") || text.includes("schema") || text.includes("backend")) {
-    surfaces.add("backend");
-    surfaces.add("shared-contract");
+function parseLatestChangelog(md: string): ReleaseChangelog | undefined {
+  const lines = md.split(/\r?\n/);
+  const start = lines.findIndex((line) => /^##\s+/.test(line));
+  if (start === -1) return undefined;
+  const title = lines[start].replace(/^##\s+/, "").trim();
+  const excerpt: string[] = [];
+  for (let i = start + 1; i < lines.length; i += 1) {
+    const line = lines[i].trim();
+    if (/^##\s+/.test(line)) break;
+    if (!line) continue;
+    excerpt.push(line.replace(/^[-*]\s+/, ""));
+    if (excerpt.length >= 5) break;
   }
-  return Array.from(surfaces);
+  return { title, excerpt };
 }
 
-async function probeHosting(provider: string, url: string, apiKey: string) {
-  if (!url || !apiKey) return { ok: false, summary: "Missing hosting settings" };
-  try {
-    if (provider === "supabase") {
-      const target = `${url.replace(/\/$/, "")}/auth/v1/settings`;
-      const res = await fetch(target, { headers: { apikey: apiKey, Authorization: `Bearer ${apiKey}` }, cache: "no-store" });
-      return { ok: res.status < 500, summary: `Supabase probe ${res.status}` };
-    }
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${apiKey}` }, cache: "no-store" });
-    return { ok: res.status < 500, summary: `${provider} probe ${res.status}` };
-  } catch (error) {
-    return { ok: false, summary: error instanceof Error ? error.message : "Hosting probe failed" };
+function deriveVersion(changelog: ReleaseChangelog | undefined, commitDate: string, sha: string) {
+  if (changelog?.title) {
+    const versionMatch = changelog.title.match(/\[?([A-Za-z0-9._-]+)\]?/);
+    if (versionMatch?.[1]) return versionMatch[1].startsWith("web-") ? versionMatch[1] : `web-${versionMatch[1]}`;
   }
+  return `auto-${commitDate.slice(0, 10)}-${sha.slice(0, 7)}`;
+}
+
+function inferIntegrations(text: string) {
+  const lower = text.toLowerCase();
+  const list = ["supabase", "geoapify", "tomtom", "mapy", "jira", "github", "vercel"];
+  return list.filter((token) => lower.includes(token));
+}
+
+function inferSurfaces(text: string): Surface[] {
+  const lower = text.toLowerCase();
+  const surfaces: Surface[] = ["web"];
+  if (lower.includes("backend") || lower.includes("schema") || lower.includes("contract")) surfaces.push("backend", "shared-contract");
+  return Array.from(new Set(surfaces));
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const { projectId, projectSlug, projectKey, repoUrl, githubToken, hostingProvider, hostingUrl, hostingApiKey } = await request.json();
-    if (!projectId || !projectSlug || !repoUrl || !githubToken || !hostingProvider || !hostingUrl || !hostingApiKey) {
-      return NextResponse.json({ error: "projectId, projectSlug, repoUrl, githubToken, hostingProvider, hostingUrl and hostingApiKey are required." }, { status: 400 });
+    const { repoUrl, latestReleaseDate } = await request.json();
+    if (!repoUrl) return NextResponse.json({ error: "repoUrl is required." }, { status: 400 });
+    const { owner, repo } = parseRepo(repoUrl);
+
+    const repoRes = await fetch(`https://api.github.com/repos/${owner}/${repo}`, {
+      headers: { Accept: "application/vnd.github+json", "User-Agent": "releasegovernance" },
+      cache: "no-store",
+    });
+    if (!repoRes.ok) throw new Error(`GitHub repo lookup failed (${repoRes.status}).`);
+    const repoData: any = await repoRes.json();
+    const branch = repoData.default_branch || "main";
+
+    const commitRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/commits/${branch}`, {
+      headers: { Accept: "application/vnd.github+json", "User-Agent": "releasegovernance" },
+      cache: "no-store",
+    });
+    if (!commitRes.ok) throw new Error(`GitHub commit lookup failed (${commitRes.status}).`);
+    const commitData: any = await commitRes.json();
+    const commitDate = commitData.commit?.committer?.date ?? new Date().toISOString();
+
+    if (latestReleaseDate && commitDate.slice(0, 10) <= latestReleaseDate) {
+      return NextResponse.json({ candidate: null });
     }
 
-    const { owner, repo } = parseGitHubRepoUrl(repoUrl);
-    const commits: any[] = await githubFetch(`https://api.github.com/repos/${owner}/${repo}/commits?per_page=1`, githubToken);
-    const latestCommit = commits[0];
-    if (!latestCommit) throw new Error("No commits found on repository.");
+    let changelog: ReleaseChangelog | undefined;
+    for (const candidatePath of ["CHANGELOG.md", "changelog.md"]) {
+      const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${candidatePath}`;
+      const rawRes = await fetch(rawUrl, { cache: "no-store" });
+      if (rawRes.ok) {
+        const text = await rawRes.text();
+        changelog = parseLatestChangelog(text);
+        if (changelog) break;
+      }
+    }
 
-    const packageJsonRaw = await fetchRepoFile(owner, repo, "package.json", githubToken, latestCommit.sha);
-    let version = "";
-    try {
-      if (packageJsonRaw) version = JSON.parse(packageJsonRaw).version ?? "";
-    } catch {}
-
-    const changelogRaw = (await fetchRepoFile(owner, repo, "CHANGELOG.md", githubToken, latestCommit.sha)) || (await fetchRepoFile(owner, repo, "changelog.md", githubToken, latestCommit.sha));
-    const changelog = parseLatestProjectChangelog(changelogRaw, projectSlug);
-    const combinedText = [
-      latestCommit.commit?.message ?? "",
-      changelog?.title ?? "",
-      ...(changelog?.sections ?? []).flatMap((section) => [section.heading, ...section.bullets, ...section.prose]),
-    ].join("\n");
-
-    const jiraKeys = extractJiraKeys(combinedText, projectKey);
-    const versionLabel = version ? `${repo.toLowerCase().includes("mobile") ? "mobile-android" : "web"}-v${version}` : `build-${String(latestCommit.sha).slice(0, 7)}`;
-    const hosting = await probeHosting(hostingProvider, hostingUrl, hostingApiKey);
-    const surfaces = detectSurfaces(repoUrl, hostingProvider, combinedText);
-
-    const checks = [
-      { key: "repo-url", label: "GitHub repo URL", present: Boolean(repoUrl), value: repoUrl },
-      { key: "repo-token", label: "GitHub API token", present: Boolean(githubToken), value: githubToken ? "saved" : "missing" },
-      { key: "commit", label: "Latest commit detected", present: Boolean(latestCommit.sha), value: String(latestCommit.sha).slice(0, 7) },
-      { key: "version", label: "Release version detected", present: Boolean(versionLabel), value: versionLabel },
-      { key: "changelog", label: "Latest CHANGELOG entry", present: Boolean(changelog), value: changelog?.title ?? "missing" },
-      { key: "hosting-provider", label: "Hosting provider", present: Boolean(hostingProvider), value: hostingProvider },
-      { key: "hosting-url", label: "Hosting URL", present: Boolean(hostingUrl), value: hostingUrl },
-      { key: "hosting-key", label: "Hosting API key", present: Boolean(hostingApiKey), value: hostingApiKey ? "saved" : "missing" },
-      { key: "hosting-deploy", label: "Hosting deployment check", present: hosting.ok, value: hosting.summary },
-    ];
-
-    return NextResponse.json({
-      candidate: {
-        id: `candidate_${projectId}_${String(latestCommit.sha).slice(0, 12)}`,
-        version: versionLabel,
-        surfaces,
-        detectedAt: latestCommit.commit?.committer?.date ?? new Date().toISOString(),
-        source: { kind: "github", owner, repository: repo, ref: latestCommit.sha, url: repoUrl, label: `${owner}/${repo}` },
-        repoUrl,
-        hostingProvider,
-        hostingUrl,
-        hostingSummary: hosting.summary,
-        commitSha: latestCommit.sha,
-        commitMessage: latestCommit.commit?.message ?? "",
-        commitUrl: latestCommit.html_url,
-        jiraKeys,
-        changelog: changelog ?? undefined,
-        releaseNotes: changelog?.title ?? `Detected from latest commit ${String(latestCommit.sha).slice(0, 7)}`,
-        requiredChecks: checks,
-        integrationsChanged: Array.from(new Set([hostingProvider, combinedText.toLowerCase().includes("supabase") ? "supabase" : "", combinedText.toLowerCase().includes("vercel") ? "vercel" : "", "github"].filter(Boolean))),
-        backendChanged: surfaces.includes("backend"),
-        sharedContractChanged: surfaces.includes("shared-contract"),
-        schemaChanged: /schema|migration|rls|table|column/i.test(combinedText),
+    const textSeed = `${commitData.commit?.message ?? ""} ${changelog?.title ?? ""} ${(changelog?.excerpt ?? []).join(" ")}`;
+    const candidate: ReleaseCandidate = {
+      id: `candidate_${commitData.sha.slice(0, 7)}`,
+      version: deriveVersion(changelog, commitDate, commitData.sha),
+      surfaces: inferSurfaces(textSeed),
+      detectedAt: commitDate,
+      backendChanged: /backend|schema|supabase|data/i.test(textSeed),
+      sharedContractChanged: /contract|payload|schema|shared/i.test(textSeed),
+      schemaChanged: /schema|migration|column|table/i.test(textSeed),
+      integrationsChanged: inferIntegrations(textSeed),
+      releaseNotes: changelog?.excerpt?.[0] ?? commitData.commit?.message ?? "Latest commit detected.",
+      deploymentComment: commitData.commit?.message ?? "Latest GitHub commit detected.",
+      changelog,
+      commitMessage: commitData.commit?.message,
+      commitUrl: commitData.html_url,
+      source: {
+        kind: "github",
+        owner,
+        repository: repo,
+        ref: commitData.sha,
+        url: commitData.html_url,
+        label: `GitHub / ${owner}/${repo}`,
       },
-    });
+    };
+
+    return NextResponse.json({ candidate });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Release detection failed." }, { status: 500 });
   }

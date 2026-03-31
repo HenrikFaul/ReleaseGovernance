@@ -1,52 +1,55 @@
-# CHANGELOG
+# Changelog
 
 Read this whole file before starting work. Do not remove previously delivered functionality from the codebase. New changes must always be appended with timestamp and context. Never replace the file contents with only the newest change.
 
-## [Unreleased] - 2026-03-30 08:25 UTC
+## Versioning references
+- `versioning/business_request_01000001.pdf`
+- `versioning/ai_dev_prompt_01000001.md`
+- `versioning/business_request_01000002.pdf`
+- `versioning/ai_dev_prompt_01000002.md`
 
-### Fixed
-- Removed the `node:fs` / `node:path` runtime-control dependency from code that is imported by client-rendered pages. Runtime control is now parsed from an embedded YAML string so webpack does not try to bundle unsupported `node:` scheme imports into the app shell.
-- Kept the same runtime-control structure for sidebar and project-upload options while eliminating the Vercel webpack `UnhandledSchemeError`.
+## [Unreleased] - 2026-03-31 20:40 UTC
 
-### Why this was needed
-- The previous approach imported a helper that used `node:fs` and `node:path` from a component path that is included in page bundles.
-- In Next.js/Vercel this caused webpack to fail on `node:` scheme resolution during production build.
-
-### Follow-up
-- If we later want the YAML file itself to become the single live source of truth at runtime, it must be loaded only on the server side or transformed at build time into a client-safe representation.
-
-## [Unreleased] - 2026-03-30 10:40 UTC
+### Requirement checklist for this round
+- [x] Releases default to a compact list view similar to a deployment registry.
+- [x] Release detail keeps the expanded detailed view with changelog excerpt and deployment comment.
+- [x] Auto release detection was added so a fresh GitHub commit can surface as a candidate row at the top of the release list.
+- [x] Push to Jira preview/apply flow was added from selected release rows.
+- [x] Dashboard cards were regrouped into Release / Capabilities / Integrations dashboard sections.
+- [x] Release dashboard now contains tracked releases, unreleased groups, backfill candidates and release candidates.
+- [x] Capabilities dashboard now groups capabilities with open parity alerts.
+- [x] Integrations dashboard is kept as a dedicated grouped section.
+- [x] Sidebar no longer exposes separate Releases / Capabilities / Integrations / Traceability entries.
+- [x] Header was simplified so the active project name is centered and warning remains on the right.
+- [x] Automation CSV export was fixed to export actual backfill candidate rows instead of empty output.
+- [x] New versioning PDF + MD pair was generated and linked here.
 
 ### Added
-- Workspace-level **Add a new project** flow on the Projects page.
-- Dedicated project-bootstrap modal with separate GitHub, hosting and Jira sections.
-- Separate save + test actions for GitHub, hosting and Jira during project bootstrap.
-- Project creation from preview so the new project appears as its own dashboard tile and can then be managed like the seeded projects.
+- Auto-generated GitHub release candidate detection via `/api/release-detection`.
+- Push to Jira preview via `/api/jira/push-preview`.
+- Push to Jira apply via `/api/jira/push-apply`.
+- Grouped dashboard sections for Release / Capabilities / Integrations.
+- Release candidate and backfill candidate support in the shared type system.
+- Seeded ReleaseGovernance project data so the governance project itself can demonstrate grouped dashboards and CSV export.
 
 ### Changed
-- Moved **Project Upload** out of the per-project Import page. Brand new projects are now created only from the workspace-level Projects page.
-- Kept the existing Import Studio focused on already existing projects.
+- Releases page now supports list/detailed toggle, selection and Push to Jira workflow.
+- Release detail page now surfaces changelog excerpt and deployment comment more explicitly.
+- Sidebar navigation was simplified to Projects / Dashboard / Automation / Import.
 
 ### Fixed
-- Jira preview/import now works with base Jira URL + explicit project key, not only with project/issue/JQL URLs.
-- Added missing custom-project persistence so newly created projects can be listed alongside seeded projects.
+- CSV export now uses real backfill rows instead of generating an empty file when candidates exist.
+- Release center now shows a latest auto-detected candidate row instead of remaining stale after new commits.
 
-## [Unreleased] - 2026-03-30 17:20 UTC
+## [0.1.0-mvp] - 2026-03-28
 
 ### Added
-- Release Center now supports **view switching** between a compact Vercel-style list view and a detailed inline view.
-- Detailed release view in the Releases page now surfaces the captured **CHANGELOG excerpt** and **deployment comment** for each release row without leaving the list page.
-- Added **Push to Jira** preview + apply flow for selected release rows.
-- Push-to-Jira includes a lightweight built-in classifier that compares selected deployed releases to already reachable Jira issues, proposes parent issue, summary, issue type and labels, and lets the user edit the generated payload before apply.
-
-### Fixed
-- Rebuilt the **Download CSV** function from the actual release rows so it no longer exports an empty or zero-row result.
-- CSV export now includes release version, state, status, surfaces, deploy date, source, issue count, deployment comment, release notes and changelog title.
-
-### Validation checklist for this change
-- [x] Default Releases screen opens in **list view**
-- [x] Detailed inline release mode can be switched on manually
-- [x] Row click still opens full release detail page
-- [x] Download CSV exports actual visible project release data
-- [x] Push-to-Jira can preview selected rows
-- [x] Push-to-Jira lets the user edit summary / description / parent / issue type / labels before apply
+- Multi-tenant B2B web application shell for ReleaseGovernance.
+- Login placeholder and authenticated session shell.
+- Workspace and project selector with seeded governed projects.
+- Project dashboard with release center summary, capability summary, parity alerts and integrations visibility.
+- Release detail view with surface badges, backend/shared-contract flags and Jira traceability blocks.
+- Capability registry view.
+- Integrations hub view for GitHub, Jira, Vercel, Supabase and Lovable references.
+- Traceability view for requirements-to-release visibility.
+- Automation starter kit view.

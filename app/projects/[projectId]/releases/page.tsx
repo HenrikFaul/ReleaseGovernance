@@ -1,22 +1,21 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { SectionHeader, StatusBadge, SurfaceBadge } from "@/components/ui";
 import { useProjectRecord } from "@/hooks/useProjectRecord";
 import { readProjectSettings } from "@/lib/project-overrides";
+import { ReleaseCandidate, ReleaseItem } from "@/lib/types";
 
 type PushDraft = {
-  id: string;
   releaseId: string;
-  sourceReleaseVersion: string;
+  releaseVersion: string;
   summary: string;
   description: string;
-  labels: string[];
   issueType: string;
   parentKey?: string;
-  suggestedParent?: string;
+  labels: string[];
   rationale?: string;
   existingSimilar?: Array<{ key: string; summary: string; issueType?: string }>;
 };
@@ -30,11 +29,10 @@ function formatSourceLabel(source?: { kind?: string; owner?: string; repository?
 }
 
 function escapeCsv(value: unknown) {
-  const text = String(value ?? "");
-  return `"${text.replace(/"/g, '""')}"`;
+  return `"${String(value ?? "").replace(/"/g, '""')}"`;
 }
 
-function releaseCsv(project: any) {
+function releaseRowsCsv(releases: Array<ReleaseItem | (ReleaseCandidate & { status?: string; releaseState?: string; jiraLinks?: any[] })>) {
   const header = [
     "release_version",
     "release_state",
@@ -49,22 +47,20 @@ function releaseCsv(project: any) {
     "changelog_title",
     "jira_linked",
   ];
-
-  const rows = project.releases.map((release: any) => [
+  const rows = releases.map((release: any) => [
     release.version,
     release.releaseState ?? "released",
     release.status ?? "old",
-    release.surfaces.join("|"),
-    release.shippedAt,
+    (release.surfaces ?? []).join("|"),
+    release.shippedAt ?? release.detectedAt ?? "",
     release.source?.kind ?? "unknown",
     formatSourceLabel(release.source),
-    String(release.jiraLinks.length),
+    String((release.jiraLinks ?? []).length),
     release.deploymentComment ?? "",
     release.releaseNotes ?? "",
     release.changelog?.title ?? "",
-    release.jiraLinks.length ? "Yes" : "No",
+    (release.jiraLinks ?? []).length ? "Yes" : "No",
   ]);
-
   return [header, ...rows].map((row) => row.map(escapeCsv).join(",")).join("\n");
 }
 
@@ -78,34 +74,64 @@ function download(filename: string, content: string, type: string) {
   URL.revokeObjectURL(url);
 }
 
-function toneForStatus(status?: string) {
-  if (status === "current") return "success";
-  if (status === "unreleased") return "info";
-  return "neutral";
-}
-
-function changelogSnippet(release: any) {
-  if (!release.changelog) return "No changelog excerpt captured for this release.";
-  const sectionLines = release.changelog.sections.flatMap((section: any) => [
-    section.heading,
-    ...section.bullets,
-    ...section.prose,
-  ]);
-  return [release.changelog.title, ...sectionLines].filter(Boolean).join(" • ");
+function candidateToRow(candidate: ReleaseCandidate) {
+  return {
+    ...candidate,
+    shippedAt: candidate.detectedAt.slice(0, 10),
+    status: "candidate",
+    releaseState: "released",
+    jiraLinks: [],
+  } as ReleaseItem & { isCandidate: true };
 }
 
 export default function ReleasesPage({ params }: { params: { projectId: string } }) {
-  const router = useRouter();
   const { project } = useProjectRecord(params.projectId);
-
   const [viewMode, setViewMode] = useState<"list" | "detailed">("list");
+  const [candidate, setCandidate] = useState<ReleaseCandidate | null>(null);
+  const [detecting, setDetecting] = useState(false);
   const [selectedReleaseIds, setSelectedReleaseIds] = useState<string[]>([]);
+  const [showPushModal, setShowPushModal] = useState(false);
   const [pushDrafts, setPushDrafts] = useState<PushDraft[]>([]);
-  const [pushPreviewInfo, setPushPreviewInfo] = useState<{ matchedIssues?: number; analyzedReleases?: number } | null>(null);
+  const [pushInfo, setPushInfo] = useState<{ matchedIssues?: number; analyzedReleases?: number } | null>(null);
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushApplying, setPushApplying] = useState(false);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
-  const [isPreviewingPush, setIsPreviewingPush] = useState(false);
-  const [isApplyingPush, setIsApplyingPush] = useState(false);
+
+  const settings = useMemo(() => (project ? readProjectSettings(project.id) : {}), [project?.id]);
+  const [jiraUrl, setJiraUrl] = useState(settings.jiraUrl ?? "");
+  const [jiraEmail, setJiraEmail] = useState(settings.jiraEmail ?? "");
+  const [jiraToken, setJiraToken] = useState(settings.jiraToken ?? "");
+  const [jiraProjectKey, setJiraProjectKey] = useState(settings.jiraProjectKey ?? project?.jiraProjectKey ?? "");
+
+  useEffect(() => {
+    if (!project?.repositories.web) return;
+    const repoUrl = settings.repoUrl ?? project.repositories.web;
+    if (!repoUrl || !String(repoUrl).includes("/")) return;
+    const latestReleaseDate = project.releases
+      .filter((release) => release.status !== "unreleased")
+      .map((release) => release.shippedAt)
+      .sort()
+      .at(-1);
+
+    setDetecting(true);
+    fetch("/api/release-detection", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        projectId: project.id,
+        repoUrl,
+        latestReleaseDate,
+      }),
+    })
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Release detection failed.");
+        setCandidate(data.candidate ?? null);
+      })
+      .catch(() => setCandidate(null))
+      .finally(() => setDetecting(false));
+  }, [project?.id, project?.repositories.web]);
 
   if (!project) {
     return (
@@ -115,17 +141,10 @@ export default function ReleasesPage({ params }: { params: { projectId: string }
     );
   }
 
-  const released = project.releases.filter((release: any) => release.status !== "unreleased");
-  const unreleased = project.releases.filter((release: any) => release.status === "unreleased");
-  const grouped = [
-    { title: "Released", items: released },
-    { title: "Unreleased", items: unreleased },
-  ];
-
-  const selectedReleases = useMemo(
-    () => project.releases.filter((release: any) => selectedReleaseIds.includes(release.id)),
-    [project.releases, selectedReleaseIds]
-  );
+  const released = project.releases.filter((release) => release.status !== "unreleased");
+  const unreleased = project.releases.filter((release) => release.status === "unreleased");
+  const effectiveReleased = candidate ? [candidateToRow(candidate), ...released] : released;
+  const selectedReleases = project.releases.filter((release) => selectedReleaseIds.includes(release.id));
 
   function toggleReleaseSelection(releaseId: string) {
     setSelectedReleaseIds((current) =>
@@ -133,219 +152,141 @@ export default function ReleasesPage({ params }: { params: { projectId: string }
     );
   }
 
-  function openRelease(releaseId: string) {
-    router.push(`/projects/${project.id}/releases/${releaseId}`);
-  }
-
-  function exportCurrentProjectCsv() {
+  async function handlePushPreview() {
+    if (!selectedReleases.length) {
+      setError("Select at least one deployed release row first.");
+      return;
+    }
     setError("");
     setStatus("");
-    const csv = releaseCsv(project);
-    const rowCount = project.releases.length;
-    download(`${project.slug}-releases.csv`, csv, "text/csv;charset=utf-8");
-    setStatus(`CSV exported with ${rowCount} release row(s).`);
-  }
-
-  async function previewPushToJira() {
-    setError("");
-    setStatus("");
-    setIsPreviewingPush(true);
+    setPushBusy(true);
     try {
-      const settings = readProjectSettings(project.id);
-      if (!settings.jiraUrl || !settings.jiraEmail || !settings.jiraToken || !(settings.jiraProjectKey || project.jiraProjectKey)) {
-        throw new Error("Jira settings are missing. Save Jira URL, email, token and project key first.");
-      }
-
-      const releasePayload = selectedReleases.map((release: any) => ({
-        id: release.id,
-        version: release.version,
-        shippedAt: release.shippedAt,
-        releaseNotes: release.releaseNotes,
-        deploymentComment: release.deploymentComment,
-        surfaces: release.surfaces,
-        integrationsChanged: release.integrationsChanged,
-        backendChanged: release.backendChanged,
-        sharedContractChanged: release.sharedContractChanged,
-        schemaChanged: release.schemaChanged,
-        changelog: release.changelog,
-        deliveredCapabilities: release.deliveredCapabilities
-          .map((capabilityId: string) => project.capabilities.find((capability: any) => capability.id === capabilityId))
-          .filter(Boolean),
-        jiraLinks: release.jiraLinks,
-      }));
-
       const res = await fetch("/api/jira/push-preview", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          jiraUrl: settings.jiraUrl,
-          jiraEmail: settings.jiraEmail,
-          jiraToken: settings.jiraToken,
-          projectKey: settings.jiraProjectKey || project.jiraProjectKey,
-          projectName: project.name,
-          importedJiraIssues: project.importedJiraIssues ?? [],
-          releases: releasePayload,
+          jiraUrl,
+          email: jiraEmail,
+          apiToken: jiraToken,
+          projectKey: jiraProjectKey || project.jiraProjectKey,
+          releases: selectedReleases,
+          importedIssues: project.importedJiraIssues ?? [],
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Push-to-Jira preview failed.");
-
+      if (!res.ok) throw new Error(data.error || "Push to Jira preview failed.");
       setPushDrafts(data.drafts ?? []);
-      setPushPreviewInfo({
-        matchedIssues: data.matchedIssues ?? 0,
-        analyzedReleases: data.analyzedReleases ?? selectedReleases.length,
-      });
-      setStatus(`Push-to-Jira preview generated for ${selectedReleases.length} release row(s).`);
+      setPushInfo(data.preview ?? null);
+      setShowPushModal(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Push-to-Jira preview failed.");
+      setError(err instanceof Error ? err.message : "Push preview failed.");
     } finally {
-      setIsPreviewingPush(false);
+      setPushBusy(false);
     }
   }
 
-  async function applyPushToJira() {
+  async function handlePushApply() {
+    setPushApplying(true);
     setError("");
     setStatus("");
-    setIsApplyingPush(true);
     try {
-      const settings = readProjectSettings(project.id);
-      if (!settings.jiraUrl || !settings.jiraEmail || !settings.jiraToken || !(settings.jiraProjectKey || project.jiraProjectKey)) {
-        throw new Error("Jira settings are missing. Save Jira URL, email, token and project key first.");
-      }
       const res = await fetch("/api/jira/push-apply", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          jiraUrl: settings.jiraUrl,
-          jiraEmail: settings.jiraEmail,
-          jiraToken: settings.jiraToken,
-          projectKey: settings.jiraProjectKey || project.jiraProjectKey,
+          jiraUrl,
+          email: jiraEmail,
+          apiToken: jiraToken,
+          projectKey: jiraProjectKey || project.jiraProjectKey,
           drafts: pushDrafts,
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Push-to-Jira apply failed.");
-      const createdKeys = (data.created ?? []).map((item: any) => item.key).filter(Boolean);
-      setStatus(
-        createdKeys.length
-          ? `Created Jira issue(s): ${createdKeys.join(", ")}`
-          : "Push-to-Jira finished, but no issue keys were returned."
-      );
+      if (!res.ok) throw new Error(data.error || "Push to Jira apply failed.");
+      setStatus(`Created ${data.created?.length ?? 0} Jira issue(s).`);
+      setShowPushModal(false);
+      setSelectedReleaseIds([]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Push-to-Jira apply failed.");
+      setError(err instanceof Error ? err.message : "Push apply failed.");
     } finally {
-      setIsApplyingPush(false);
+      setPushApplying(false);
     }
   }
 
-  function updateDraft(index: number, field: keyof PushDraft, value: string | string[]) {
-    setPushDrafts((current) =>
-      current.map((draft, idx) => {
-        if (idx !== index) return draft;
-        return { ...draft, [field]: value };
-      })
-    );
-  }
-
-  function renderListRow(release: any) {
+  function renderListRow(release: any, isAuto = false) {
+    const tone =
+      release.status === "current"
+        ? "success"
+        : release.status === "candidate"
+        ? "info"
+        : release.status === "unreleased"
+        ? "info"
+        : "neutral";
     return (
       <div
         key={release.id}
-        className={`grid min-w-[1120px] cursor-pointer gap-4 rounded-2xl border p-4 transition hover:border-slate-300 hover:bg-slate-50 xl:grid-cols-[48px,1.35fr,0.7fr,0.8fr,0.8fr,1fr,0.5fr,1.15fr,0.5fr] ${
-          selectedReleaseIds.includes(release.id) ? "border-brand-300 bg-brand-50/40" : "border-slate-200 bg-white"
-        }`}
-        onClick={() => openRelease(release.id)}
+        className="grid cursor-pointer gap-4 rounded-2xl border border-slate-200 bg-white p-4 transition hover:border-slate-300 hover:bg-slate-50 xl:grid-cols-[36px,1.2fr,0.9fr,0.75fr,0.85fr,1.15fr,0.55fr,1.2fr,0.55fr]"
+        onClick={() => !isAuto && (window.location.href = `/projects/${project.id}/releases/${release.id}`)}
       >
-        <div className="flex items-start justify-center pt-1">
-          <input
-            type="checkbox"
-            checked={selectedReleaseIds.includes(release.id)}
-            onChange={() => toggleReleaseSelection(release.id)}
-            onClick={(event) => event.stopPropagation()}
-          />
+        <div onClick={(e) => e.stopPropagation()}>
+          {!isAuto ? (
+            <input type="checkbox" checked={selectedReleaseIds.includes(release.id)} onChange={() => toggleReleaseSelection(release.id)} className="mt-2 h-4 w-4 rounded border-slate-300" />
+          ) : <span className="mt-2 inline-flex h-3.5 w-3.5 rounded-full bg-brand-500" />}
         </div>
         <div>
           <div className="text-sm font-semibold text-slate-900">{release.version}</div>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {release.surfaces.map((surface: string) => (
-              <SurfaceBadge key={surface} surface={surface} />
-            ))}
-          </div>
+          <div className="mt-1 flex flex-wrap gap-2">{(release.surfaces ?? []).map((surface: string) => <SurfaceBadge key={surface} surface={surface} />)}</div>
         </div>
-        <div>
-          <div className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Status</div>
-          <div className="mt-2">
-            <StatusBadge tone={toneForStatus(release.status)}>{release.status ?? "old"}</StatusBadge>
-          </div>
-        </div>
-        <div>
-          <div className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Deploy date</div>
-          <div className="mt-2 text-sm text-slate-700">{release.shippedAt}</div>
-        </div>
-        <div>
-          <div className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Source kind</div>
-          <div className="mt-2 text-sm text-slate-700">{release.source?.kind ?? "unknown"}</div>
-        </div>
-        <div>
-          <div className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Source repository</div>
-          <div className="mt-2 text-sm text-slate-700">{formatSourceLabel(release.source)}</div>
-        </div>
-        <div>
-          <div className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Issue count</div>
-          <div className="mt-2 text-sm text-slate-700">{release.jiraLinks.length}</div>
-        </div>
-        <div>
-          <div className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Deployment comment</div>
-          <div className="mt-2 line-clamp-3 text-sm text-slate-700">
-            {release.deploymentComment ?? release.releaseNotes}
-          </div>
-        </div>
-        <div>
-          <div className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Jira linked</div>
-          <div className="mt-2 text-sm text-slate-700">{release.jiraLinks.length ? "Yes" : "No"}</div>
-        </div>
+        <div className="text-sm text-slate-600"><div className="font-medium text-slate-900">Status</div><div className="mt-1"><StatusBadge tone={tone as any}>{release.status ?? "old"}</StatusBadge></div></div>
+        <div className="text-sm text-slate-600"><div className="font-medium text-slate-900">Deploy date</div><div className="mt-1">{release.shippedAt}</div></div>
+        <div className="text-sm text-slate-600"><div className="font-medium text-slate-900">Source kind</div><div className="mt-1">{release.source?.kind ?? "unknown"}</div></div>
+        <div className="text-sm text-slate-600"><div className="font-medium text-slate-900">Source repository</div><div className="mt-1">{formatSourceLabel(release.source)}</div></div>
+        <div className="text-sm text-slate-600"><div className="font-medium text-slate-900">Issue count</div><div className="mt-1">{(release.jiraLinks ?? []).length}</div></div>
+        <div className="text-sm text-slate-600"><div className="font-medium text-slate-900">Deployment comment</div><div className="mt-1">{release.deploymentComment ?? release.releaseNotes}</div></div>
+        <div className="text-sm text-slate-600"><div className="font-medium text-slate-900">Jira linked</div><div className="mt-1">{(release.jiraLinks ?? []).length > 0 ? "Yes" : "No"}</div></div>
       </div>
     );
   }
 
-  function renderDetailedCard(release: any) {
+  function renderDetailedCard(release: any, isAuto = false) {
+    const tone =
+      release.status === "current"
+        ? "success"
+        : release.status === "candidate"
+        ? "info"
+        : release.status === "unreleased"
+        ? "info"
+        : "neutral";
     return (
-      <div
-        key={release.id}
-        className={`card cursor-pointer p-6 transition hover:border-slate-300 hover:bg-slate-50 ${
-          selectedReleaseIds.includes(release.id) ? "border-brand-300 bg-brand-50/40" : ""
-        }`}
-        onClick={() => openRelease(release.id)}
-      >
-        <div className="flex flex-wrap items-start justify-between gap-4">
+      <div key={release.id} className="card p-6">
+        <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="text-lg font-semibold text-slate-900">{release.version}</div>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {release.surfaces.map((surface: string) => (
-                <SurfaceBadge key={surface} surface={surface} />
-              ))}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="text-xl font-semibold text-slate-900">{release.version}</div>
+              {(release.surfaces ?? []).map((surface: string) => <SurfaceBadge key={surface} surface={surface} />)}
+              <StatusBadge tone={tone as any}>{release.status ?? "old"}</StatusBadge>
             </div>
+            <p className="mt-3 text-sm text-slate-600">{release.releaseNotes}</p>
           </div>
-          <div className="flex items-center gap-3">
-            <input
-              type="checkbox"
-              checked={selectedReleaseIds.includes(release.id)}
-              onChange={() => toggleReleaseSelection(release.id)}
-              onClick={(event) => event.stopPropagation()}
-            />
-            <StatusBadge tone={toneForStatus(release.status)}>{release.status ?? "old"}</StatusBadge>
-          </div>
+          {!isAuto ? (
+            <div className="flex items-center gap-3">
+              <input type="checkbox" checked={selectedReleaseIds.includes(release.id)} onChange={() => toggleReleaseSelection(release.id)} className="h-4 w-4 rounded border-slate-300" />
+              <Link href={`/projects/${project.id}/releases/${release.id}`} className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Open detail</Link>
+            </div>
+          ) : <StatusBadge tone="info">auto-detected</StatusBadge>}
         </div>
-        <div className="mt-5 grid gap-6 xl:grid-cols-[1fr,1fr]">
-          <div className="space-y-3 text-sm text-slate-700">
-            <div><span className="font-medium text-slate-900">Deploy date:</span> {release.shippedAt}</div>
-            <div><span className="font-medium text-slate-900">Source:</span> {formatSourceLabel(release.source)}</div>
-            <div><span className="font-medium text-slate-900">Deployment comment:</span> {release.deploymentComment ?? "—"}</div>
-            <div><span className="font-medium text-slate-900">Release notes:</span> {release.releaseNotes}</div>
+        <div className="mt-5 grid gap-4 xl:grid-cols-2">
+          <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
+            <div>Deploy date: {release.shippedAt}</div>
+            <div className="mt-2">Source: {formatSourceLabel(release.source)}</div>
+            <div className="mt-2">Deployment comment: {release.deploymentComment ?? "—"}</div>
           </div>
-          <div className="space-y-3 text-sm text-slate-700">
-            <div><span className="font-medium text-slate-900">CHANGELOG excerpt:</span></div>
-            <div className="rounded-2xl bg-slate-50 p-4 text-slate-600">{changelogSnippet(release)}</div>
+          <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
+            <div className="font-medium text-slate-900">CHANGELOG excerpt</div>
+            <div className="mt-2 text-slate-600">{release.changelog?.title ?? "No explicit changelog title"}</div>
+            <ul className="mt-3 list-disc space-y-1 pl-5">
+              {(release.changelog?.excerpt?.length ? release.changelog.excerpt : [release.releaseNotes]).map((line: string, idx: number) => <li key={idx}>{line}</li>)}
+            </ul>
           </div>
         </div>
       </div>
@@ -353,191 +294,112 @@ export default function ReleasesPage({ params }: { params: { projectId: string }
   }
 
   return (
-    <AppShell projectId={project.id} projectName={project.name}>
+    <AppShell projectId={project.id}>
       <div className="space-y-6">
-        <SectionHeader
-          eyebrow="Release center"
-          title={`${project.name} releases`}
-          description="Default view is a compact release list. Switch to Detailed view to inspect the captured CHANGELOG excerpt and deployment comment inline before opening the full release detail page."
-          actions={
+        <SectionHeader eyebrow="Release center" title={`${project.name} releases`} description="Track what shipped, where, and with which backend or integration implications. Unreleased groups hold governed scope that has not yet been deployed." />
+
+        <section className="card p-4">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-wrap gap-3">
-              <button
-                onClick={() => setViewMode("list")}
-                className={`rounded-2xl px-4 py-2 text-sm font-medium ${
-                  viewMode === "list" ? "bg-slate-900 text-white" : "border border-slate-200 text-slate-700"
-                }`}
-              >
-                List view
-              </button>
-              <button
-                onClick={() => setViewMode("detailed")}
-                className={`rounded-2xl px-4 py-2 text-sm font-medium ${
-                  viewMode === "detailed" ? "bg-slate-900 text-white" : "border border-slate-200 text-slate-700"
-                }`}
-              >
-                Detailed view
-              </button>
-              <button
-                onClick={exportCurrentProjectCsv}
-                className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-              >
-                Download CSV
-              </button>
-              <button
-                onClick={previewPushToJira}
-                disabled={!selectedReleaseIds.length || isPreviewingPush}
-                className="rounded-2xl bg-brand-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 hover:bg-brand-700"
-              >
-                {isPreviewingPush ? "Preparing..." : "Push to Jira"}
-              </button>
+              <button onClick={() => setViewMode("list")} className={`rounded-2xl px-4 py-2 text-sm font-medium ${viewMode === "list" ? "bg-brand-600 text-white" : "border border-slate-200 text-slate-700 hover:bg-slate-50"}`}>List view</button>
+              <button onClick={() => setViewMode("detailed")} className={`rounded-2xl px-4 py-2 text-sm font-medium ${viewMode === "detailed" ? "bg-brand-600 text-white" : "border border-slate-200 text-slate-700 hover:bg-slate-50"}`}>Detailed view</button>
             </div>
-          }
-        />
-
-        {grouped.map((group) => (
-          <section key={group.title} className="space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <h3 className="text-lg font-semibold text-slate-900">{group.title}</h3>
-              <div className="text-sm text-slate-500">{group.items.length} row(s)</div>
+            <div className="flex flex-wrap gap-3">
+              <button onClick={() => exportCurrentProjectCsv()} className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Download CSV</button>
+              <button onClick={handlePushPreview} disabled={pushBusy || !selectedReleaseIds.length} className="rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50">Push to Jira</button>
             </div>
+          </div>
+          {detecting ? <div className="mt-3 text-sm text-slate-500">Checking GitHub for the latest release candidate...</div> : null}
+        </section>
 
-            {!group.items.length ? (
-              <div className="card p-6 text-sm text-slate-600">
-                {group.title === "Released" ? "No released versions yet." : "No unreleased groups tracked."}
-              </div>
-            ) : viewMode === "list" ? (
-              <div className="overflow-x-auto">
-                <div className="min-w-[1120px] space-y-3">
-                  <div className="grid gap-4 rounded-2xl border border-slate-200 bg-white px-4 py-3 xl:grid-cols-[48px,1.35fr,0.7fr,0.8fr,0.8fr,1fr,0.5fr,1.15fr,0.5fr]">
-                    <div />
-                    <div className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Release version / surfaces</div>
-                    <div className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Status</div>
-                    <div className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Deploy date</div>
-                    <div className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Source kind</div>
-                    <div className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Source repository</div>
-                    <div className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Issue count</div>
-                    <div className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Deployment comment</div>
-                    <div className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Jira linked</div>
-                  </div>
-                  {group.items.map((release: any) => renderListRow(release))}
+        <section className="space-y-3">
+          <div className="text-xl font-semibold text-slate-900">Released</div>
+          {viewMode === "list" ? (
+            <>
+              <div className="card p-4">
+                <div className="grid gap-4 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500 xl:grid-cols-[36px,1.2fr,0.9fr,0.75fr,0.85fr,1.15fr,0.55fr,1.2fr,0.55fr]">
+                  <div />
+                  <div>Release version / surfaces</div>
+                  <div>Status</div>
+                  <div>Deploy date</div>
+                  <div>Source kind</div>
+                  <div>Source repository</div>
+                  <div>Issue count</div>
+                  <div>Deployment comment</div>
+                  <div>Jira linked</div>
                 </div>
               </div>
-            ) : (
-              <div className="space-y-4">{group.items.map((release: any) => renderDetailedCard(release))}</div>
-            )}
-          </section>
-        ))}
+              {effectiveReleased.map((release) => renderListRow(release, release.status === "candidate"))}
+            </>
+          ) : (
+            <div className="space-y-4">{effectiveReleased.map((release) => renderDetailedCard(release, release.status === "candidate"))}</div>
+          )}
+        </section>
 
-        {pushDrafts.length ? (
-          <section className="card p-6">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h3 className="text-lg font-semibold text-slate-900">Push to Jira preview</h3>
-                <p className="mt-2 text-sm text-slate-600">
-                  The built-in classifier compares selected releases with the already reachable Jira issues, suggests a parent, labels and issue type, then lets you edit everything before apply.
-                </p>
-              </div>
-              <div className="flex gap-3">
-                <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                  Analysed releases: <span className="font-semibold text-slate-900">{pushPreviewInfo?.analyzedReleases ?? selectedReleaseIds.length}</span>
-                </div>
-                <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                  Matched Jira issues: <span className="font-semibold text-slate-900">{pushPreviewInfo?.matchedIssues ?? 0}</span>
-                </div>
-              </div>
-            </div>
+        <section className="space-y-3">
+          <div className="text-xl font-semibold text-slate-900">Unreleased</div>
+          {viewMode === "list" ? unreleased.map((release) => renderListRow(release)) : <div className="space-y-4">{unreleased.map((release) => renderDetailedCard(release))}</div>}
+        </section>
 
-            <div className="mt-4 space-y-4">
-              {pushDrafts.map((draft, index) => (
-                <div key={draft.id} className="rounded-2xl border border-slate-200 p-4">
-                  <div className="mb-3 flex flex-wrap items-center gap-3">
-                    <div className="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700">
-                      {draft.sourceReleaseVersion}
-                    </div>
-                    {draft.suggestedParent ? (
-                      <div className="rounded-full bg-slate-50 px-3 py-1 text-xs text-slate-600">
-                        Suggested parent: {draft.suggestedParent}
-                      </div>
-                    ) : null}
-                  </div>
-
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <input
-                      value={draft.summary}
-                      onChange={(e) => updateDraft(index, "summary", e.target.value)}
-                      className="rounded-2xl border border-slate-200 px-4 py-3 text-sm"
-                      placeholder="Summary"
-                    />
-                    <input
-                      value={draft.parentKey ?? ""}
-                      onChange={(e) => updateDraft(index, "parentKey", e.target.value.toUpperCase())}
-                      className="rounded-2xl border border-slate-200 px-4 py-3 text-sm"
-                      placeholder="Parent key (editable)"
-                    />
-                    <input
-                      value={draft.issueType}
-                      onChange={(e) => updateDraft(index, "issueType", e.target.value)}
-                      className="rounded-2xl border border-slate-200 px-4 py-3 text-sm"
-                      placeholder="Issue type"
-                    />
-                    <input
-                      value={draft.labels.join(", ")}
-                      onChange={(e) =>
-                        updateDraft(
-                          index,
-                          "labels",
-                          e.target.value.split(",").map((label) => label.trim()).filter(Boolean)
-                        )
-                      }
-                      className="rounded-2xl border border-slate-200 px-4 py-3 text-sm"
-                      placeholder="Labels separated by commas"
-                    />
-                  </div>
-
-                  <textarea
-                    value={draft.description}
-                    onChange={(e) => updateDraft(index, "description", e.target.value)}
-                    className="mt-3 min-h-[180px] w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm"
-                  />
-
-                  {draft.rationale ? (
-                    <div className="mt-3 rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
-                      <span className="font-medium text-slate-900">Classifier rationale:</span> {draft.rationale}
-                    </div>
-                  ) : null}
-
-                  {draft.existingSimilar?.length ? (
-                    <div className="mt-3 rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
-                      <div className="font-medium text-slate-900">Closest existing Jira matches</div>
-                      <div className="mt-2 space-y-2">
-                        {draft.existingSimilar.map((item) => (
-                          <div key={item.key}>
-                            <span className="font-medium text-brand-700">{item.key}</span> — {item.summary}
-                            {item.issueType ? ` (${item.issueType})` : ""}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-4 flex flex-wrap gap-3">
-              <button
-                onClick={applyPushToJira}
-                disabled={isApplyingPush}
-                className="rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 hover:bg-emerald-700"
-              >
-                {isApplyingPush ? "Applying..." : "Apply push to Jira"}
-              </button>
-            </div>
-          </section>
-        ) : null}
-
-        {error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{error}</div> : null}
         {status ? <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">{status}</div> : null}
+        {error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{error}</div> : null}
+
+        {showPushModal ? (
+          <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/40 p-4">
+            <div className="w-full max-w-5xl rounded-3xl bg-white p-6 shadow-2xl">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h3 className="text-xl font-semibold text-slate-900">Push to Jira</h3>
+                  <p className="mt-2 text-sm text-slate-600">The built-in release classifier reviewed the selected deploy rows against existing Jira issues and prepared editable suggestions.</p>
+                </div>
+                <button onClick={() => setShowPushModal(false)} className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Close</button>
+              </div>
+
+              <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <input value={jiraUrl} onChange={(e) => setJiraUrl(e.target.value)} placeholder="https://example.atlassian.net" className="rounded-2xl border border-slate-200 px-4 py-3 text-sm" />
+                <input value={jiraProjectKey} onChange={(e) => setJiraProjectKey(e.target.value.toUpperCase())} placeholder="Project key" className="rounded-2xl border border-slate-200 px-4 py-3 text-sm" />
+                <input value={jiraEmail} onChange={(e) => setJiraEmail(e.target.value)} placeholder="Jira email" className="rounded-2xl border border-slate-200 px-4 py-3 text-sm" />
+                <input value={jiraToken} onChange={(e) => setJiraToken(e.target.value)} type="password" placeholder="Jira API token" className="rounded-2xl border border-slate-200 px-4 py-3 text-sm" />
+              </div>
+
+              {pushInfo ? <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">Analyzed releases: {pushInfo.analyzedReleases ?? 0} · Existing Jira issues reviewed: {pushInfo.matchedIssues ?? 0}</div> : null}
+
+              <div className="mt-5 space-y-4">
+                {pushDrafts.map((draft, index) => (
+                  <div key={draft.releaseId} className="rounded-2xl border border-slate-200 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <div className="font-medium text-slate-900">{draft.releaseVersion}</div>
+                        {draft.rationale ? <div className="mt-1 text-sm text-slate-500">{draft.rationale}</div> : null}
+                      </div>
+                      <div className="text-xs text-slate-500">{draft.existingSimilar?.map((item) => item.key).join(", ") || "No strong existing match"}</div>
+                    </div>
+                    <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                      <input value={draft.summary} onChange={(e) => setPushDrafts((current) => current.map((item, idx) => idx === index ? { ...item, summary: e.target.value } : item))} className="rounded-2xl border border-slate-200 px-4 py-3 text-sm md:col-span-2" />
+                      <input value={draft.issueType} onChange={(e) => setPushDrafts((current) => current.map((item, idx) => idx === index ? { ...item, issueType: e.target.value } : item))} className="rounded-2xl border border-slate-200 px-4 py-3 text-sm" />
+                      <input value={draft.parentKey ?? ""} onChange={(e) => setPushDrafts((current) => current.map((item, idx) => idx === index ? { ...item, parentKey: e.target.value } : item))} placeholder="Parent key (optional)" className="rounded-2xl border border-slate-200 px-4 py-3 text-sm" />
+                    </div>
+                    <textarea value={draft.description} onChange={(e) => setPushDrafts((current) => current.map((item, idx) => idx === index ? { ...item, description: e.target.value } : item))} rows={6} className="mt-3 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm" />
+                    <input value={draft.labels.join(", ")} onChange={(e) => setPushDrafts((current) => current.map((item, idx) => idx === index ? { ...item, labels: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) } : item))} className="mt-3 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm" />
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-5 flex justify-end gap-3">
+                <button onClick={() => setShowPushModal(false)} className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancel</button>
+                <button onClick={handlePushApply} disabled={pushApplying} className="rounded-2xl bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">{pushApplying ? "Applying..." : "Apply"}</button>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
     </AppShell>
   );
+
+  function exportCurrentProjectCsv() {
+    const csv = releaseRowsCsv([...effectiveReleased, ...unreleased]);
+    download(`${project.slug}-releases.csv`, csv, "text/csv;charset=utf-8");
+    setStatus(`CSV exported with ${effectiveReleased.length + unreleased.length} release row(s).`);
+    setError("");
+  }
 }

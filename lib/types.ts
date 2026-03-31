@@ -2,7 +2,7 @@ export type Surface = "web" | "mobile-android" | "mobile-ios" | "backend" | "sha
 export type CapabilityStatus = "planned" | "partial" | "shipped" | "deprecated";
 export type DeploymentStatus = "healthy" | "warning" | "failing";
 export type ReleaseState = "released" | "unreleased";
-export type ReleaseStatus = "current" | "old" | "unreleased";
+export type ReleaseStatus = "current" | "old" | "unreleased" | "candidate";
 export type ReleaseSourceKind = "github" | "uploaded-snapshot" | "markdown-import" | "jira-import" | "manual" | "unknown";
 
 export interface JiraLink {
@@ -22,10 +22,10 @@ export interface ImportedJiraIssue {
   labels: string[];
   url: string;
   source: "jira-url" | "jira-project" | "file-import";
-  status?: string;
   issueType?: string;
-  created?: string;
+  status?: string;
   parentKey?: string;
+  created?: string;
 }
 
 export interface IntegrationRef {
@@ -47,16 +47,9 @@ export interface ReleaseSource {
   label?: string;
 }
 
-export interface ReleaseChangelogSection {
-  heading: string;
-  bullets: string[];
-  prose: string[];
-}
-
-export interface ReleaseChangelogExcerpt {
+export interface ReleaseChangelog {
   title: string;
-  date?: string;
-  sections: ReleaseChangelogSection[];
+  excerpt: string[];
 }
 
 export interface ReleaseItem {
@@ -76,9 +69,7 @@ export interface ReleaseItem {
   jiraLinks: JiraLink[];
   source?: ReleaseSource;
   deploymentComment?: string;
-  commitMessage?: string;
-  commitUrl?: string;
-  changelog?: ReleaseChangelogExcerpt;
+  changelog?: ReleaseChangelog;
 }
 
 export interface CapabilityRecord {
@@ -108,6 +99,34 @@ export interface ParityAlert {
   state: "open" | "tracked" | "resolved";
 }
 
+export interface BackfillCandidate {
+  id: string;
+  featureName: string;
+  summary: string;
+  description: string;
+  parent: string;
+  labels: string[];
+  issueType: string;
+  recommendedRelease?: string;
+}
+
+export interface ReleaseCandidate {
+  id: string;
+  version: string;
+  surfaces: Surface[];
+  detectedAt: string;
+  backendChanged: boolean;
+  sharedContractChanged: boolean;
+  schemaChanged: boolean;
+  integrationsChanged: string[];
+  releaseNotes: string;
+  deploymentComment?: string;
+  source: ReleaseSource;
+  changelog?: ReleaseChangelog;
+  commitMessage?: string;
+  commitUrl?: string;
+}
+
 export interface ProjectOverview {
   applicationDescription: string;
   techStack: string[];
@@ -117,45 +136,18 @@ export interface ProjectOverview {
   runtimeNotes?: string[];
 }
 
-export interface BackfillCandidate {
-  id: string;
-  featureName: string;
-  summary: string;
-  description: string;
-  parent: string;
-  labels: string[] | string;
-  issueType: "Story" | "Task" | "Bug" | "Epic";
-  recommendedRelease?: string;
-}
-
-export interface ReleaseCandidateCheck {
-  key: string;
-  label: string;
-  present: boolean;
-  value?: string;
-}
-
-export interface ReleaseCandidate {
-  id: string;
-  version: string;
-  surfaces: Surface[];
-  detectedAt: string;
-  source: ReleaseSource;
-  repoUrl: string;
-  hostingProvider: "vercel" | "supabase" | "custom";
-  hostingUrl: string;
-  hostingSummary?: string;
-  commitSha?: string;
-  commitMessage?: string;
-  commitUrl?: string;
-  jiraKeys: string[];
-  changelog?: ReleaseChangelogExcerpt;
-  releaseNotes: string;
-  requiredChecks: ReleaseCandidateCheck[];
-  integrationsChanged: string[];
-  backendChanged: boolean;
-  sharedContractChanged: boolean;
-  schemaChanged: boolean;
+export interface ProjectIntegrationSettings {
+  jiraUrl?: string;
+  jiraEmail?: string;
+  jiraToken?: string;
+  jiraProjectKey?: string;
+  repoUrl?: string;
+  githubToken?: string;
+  hostingProvider?: "vercel" | "supabase" | "custom";
+  hostingUrl?: string;
+  hostingApiKey?: string;
+  jiraPreviewLimit?: number;
+  jiraQueryAll?: boolean;
 }
 
 export interface ProjectRecord {
@@ -196,18 +188,4 @@ export interface ProjectImportBundle {
 export interface ProjectOverride extends Partial<ProjectImportBundle> {
   backfillCandidates?: BackfillCandidate[];
   releaseCandidates?: ReleaseCandidate[];
-}
-
-export interface ProjectIntegrationSettings {
-  jiraUrl?: string;
-  jiraEmail?: string;
-  jiraToken?: string;
-  jiraProjectKey?: string;
-  jiraPreviewLimit?: number;
-  jiraQueryAll?: boolean;
-  repoUrl?: string;
-  githubToken?: string;
-  hostingProvider?: "vercel" | "supabase" | "custom";
-  hostingUrl?: string;
-  hostingApiKey?: string;
 }
