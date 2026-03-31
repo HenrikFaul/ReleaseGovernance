@@ -22,3 +22,10 @@ Kötelező szerkezet minden új bejegyzésnél:
 - **Javítás:** a patch előtt explicit módon osztályozni kell a hibát: `syntax`, `types`, `server-only import`, `runtime regression`, `data regression`, stb.
 - **Megelőzés:** a lessons file-ból kötelező checklist legyen: 1) import trace ellenőrzés, 2) client/server boundary ellenőrzés, 3) minimális fix scope.
 - **Ellenőrzés:** mielőtt kiadsz patch-et, nézd meg, hogy a javított fájl importlánca tartalmaz-e Node-only modult.
+
+### [033] Avoid slash-opacity utility classes inside Tailwind `@apply` blocks for global CSS patches
+- **Tünet / log:** Next/Tailwind build failed with messages like `The \`bg-white/92\` class does not exist` and `The \`lg:bg-slate-950/96\` class does not exist` while compiling `app/globals.css`.
+- **Kiváltó ok:** a redesign patch `@apply` blokkokban használt tört opacitású utility osztályokat (`bg-white/92`, `bg-slate-950/96`, `border-white/70`, stb.), amelyeket a PostCSS/Tailwind feldolgozás ebben a kontextusban nem kezelt stabilan.
+- **Javítás:** az ilyen stílusokat sima CSS deklarációkra kell bontani (`background-color: rgba(...)`, `border-color: rgba(...)`), és az `@apply`-ban csak biztosan támogatott utility osztályokat szabad hagyni.
+- **Megelőzés:** ha globális CSS-ben vagy komponens-szintű utility aggregációban dolgozol, kerüld a slash-opacity utility-ket az `@apply`-ban; használd őket inkább közvetlen JSX className-ben vagy sima CSS tulajdonságként.
+- **Ellenőrzés:** minden globális redesign patch után futtasd le a production buildet, és külön ellenőrizd az `app/globals.css`-hez kapcsolódó Tailwind/PostCSS hibákat.
