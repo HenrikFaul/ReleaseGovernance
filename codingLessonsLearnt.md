@@ -50,3 +50,24 @@ Kötelező szerkezet minden új bejegyzésnél:
 - **Javítás:** külön localStorage kulcsokat kell használni az újonnan létrehozott projektekhez és a project-upload draft adatokhoz.
 - **Megelőzés:** különítsd el a `new project creation` és az `existing project mutation` use case-eket adatszinten is.
 - **Ellenőrzés:** új projekt létrehozás után újra megnyitva a Projects oldalt is látszódnia kell a projekt csempéjének.
+
+### [037] Export actions must be driven from the real in-memory rows, not a stale or filtered zero-length source
+- **Tünet / log:** a Download CSV funkció 0 soros vagy üres eredményt adott, miközben a Releases oldalon láthatóan voltak release sorok.
+- **Kiváltó ok:** az export logika nem közvetlenül a projekt aktuális `releases` tömbjéből épült, vagy hibásan másik / üres adatsorra támaszkodott.
+- **Javítás:** az export CSV-t közvetlenül a `project.releases` adataiból kell generálni, és ki kell írni a tényleges exportált sorszámot is.
+- **Megelőzés:** minden export funkciónál a renderelt / aktív adatszerkezet legyen az egyetlen forrás.
+- **Ellenőrzés:** export után egyeznie kell a sorok számának a projekt aktuális release darabszámával.
+
+### [038] List view and detailed view are different presentation modes, not different data sources
+- **Tünet / log:** a Releases oldalon a felhasználó alapértelmezett kompakt listát kért, és csak opcionálisan részletes inline nézetet.
+- **Kiváltó ok:** könnyű külön adatlogikát írni a két nézethez, ami később eltérésekhez vezet.
+- **Javítás:** a list és detailed nézet ugyanazt a release adathalmazt használja, csak más prezentációval.
+- **Megelőzés:** nézetváltásnál mindig ugyanazt a rekordforrást használd.
+- **Ellenőrzés:** ugyanazok a release-ek jelenjenek meg mindkét nézetben, azonos kiválasztási és navigációs működéssel.
+
+### [039] Push-to-Jira must be preview-first and editable before apply
+- **Tünet / log:** a felhasználó nem automatikus vak feltöltést kért, hanem AI-szerű előkészítést, szerkeszthető parent / summary / description / labels javaslatokkal.
+- **Kiváltó ok:** közvetlen create-issue flow túl veszélyes lenne.
+- **Javítás:** először preview route kell, amely a release-eket összeveti az elérhető Jira issue-kkal, javaslatot készít, majd csak külön apply lépés hoz létre issue-kat.
+- **Megelőzés:** destruktív vagy külső rendszert módosító műveletnél mindig legyen előnézeti/szerkesztési fázis.
+- **Ellenőrzés:** Push to Jira gomb után szerkeszthető preview jelenjen meg, és csak az Apply push to Jira hajtson végre create műveletet.

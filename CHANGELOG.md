@@ -30,3 +30,23 @@ Read this whole file before starting work. Do not remove previously delivered fu
 ### Fixed
 - Jira preview/import now works with base Jira URL + explicit project key, not only with project/issue/JQL URLs.
 - Added missing custom-project persistence so newly created projects can be listed alongside seeded projects.
+
+## [Unreleased] - 2026-03-30 17:20 UTC
+
+### Added
+- Release Center now supports **view switching** between a compact Vercel-style list view and a detailed inline view.
+- Detailed release view in the Releases page now surfaces the captured **CHANGELOG excerpt** and **deployment comment** for each release row without leaving the list page.
+- Added **Push to Jira** preview + apply flow for selected release rows.
+- Push-to-Jira includes a lightweight built-in classifier that compares selected deployed releases to already reachable Jira issues, proposes parent issue, summary, issue type and labels, and lets the user edit the generated payload before apply.
+
+### Fixed
+- Rebuilt the **Download CSV** function from the actual release rows so it no longer exports an empty or zero-row result.
+- CSV export now includes release version, state, status, surfaces, deploy date, source, issue count, deployment comment, release notes and changelog title.
+
+### Validation checklist for this change
+- [x] Default Releases screen opens in **list view**
+- [x] Detailed inline release mode can be switched on manually
+- [x] Row click still opens full release detail page
+- [x] Download CSV exports actual visible project release data
+- [x] Push-to-Jira can preview selected rows
+- [x] Push-to-Jira lets the user edit summary / description / parent / issue type / labels before apply
