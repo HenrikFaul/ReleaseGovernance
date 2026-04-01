@@ -11,9 +11,9 @@ import { ReleaseCandidate } from "@/lib/types";
 
 function GroupStat({ label, value, helper }: { label: string; value: string; helper: string }) {
   return (
-    <div className="rounded-3xl border border-slate-200 bg-white p-5">
+    <div className="rounded-3xl border border-slate-200 bg-white p-4 sm:p-5">
       <div className="text-sm text-slate-500">{label}</div>
-      <div className="mt-2 text-4xl font-semibold text-slate-950">{value}</div>
+      <div className="mt-2 text-3xl font-semibold text-slate-950 sm:text-4xl">{value}</div>
       <div className="mt-3 text-sm leading-6 text-slate-500">{helper}</div>
     </div>
   );
@@ -31,10 +31,10 @@ function GroupSection({
   children: React.ReactNode;
 }) {
   return (
-    <section className="card p-6">
-      <div className="flex items-center justify-between gap-4">
-        <h3 className="text-xl font-semibold text-slate-950">{title}</h3>
-        <Link href={buttonHref} className="rounded-2xl bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">
+    <section className="card p-5 sm:p-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <h3 className="text-2xl font-semibold text-slate-950">{title}</h3>
+        <Link href={buttonHref} className="rounded-3xl bg-brand-600 px-5 py-3 text-base font-medium text-white hover:bg-brand-700 self-start sm:self-auto">
           {buttonLabel}
         </Link>
       </div>
@@ -102,7 +102,7 @@ export default function ProjectDashboardPage({ params }: { params: { projectId: 
         />
 
         <GroupSection title="Release dashboard" buttonLabel="Open release dashboard" buttonHref={`/projects/${project.id}/releases`}>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
             <GroupStat label="Tracked releases" value={String(deployedReleases.length)} helper="Deployed release rows" />
             <GroupStat label="Unreleased groups" value={String(unreleasedReleases.length)} helper="Specified but not yet deployed" />
             <GroupStat label="Backfill candidates" value={String(backfillCount)} helper="Deployed without Jira" />
@@ -111,14 +111,14 @@ export default function ProjectDashboardPage({ params }: { params: { projectId: 
         </GroupSection>
 
         <GroupSection title="Capabilities dashboard" buttonLabel="Open capabilities dashboard" buttonHref={`/projects/${project.id}/capabilities`}>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-2">
+          <div className="grid grid-cols-2 gap-4">
             <GroupStat label="Capabilities" value={String(project.capabilities.length)} helper="Tracked independently from commits" />
             <GroupStat label="Open parity alerts" value={String(openAlerts.length)} helper="Cross-surface follow-up required" />
           </div>
         </GroupSection>
 
         <GroupSection title="Integrations dashboard" buttonLabel="Open integrations dashboard" buttonHref={`/projects/${project.id}/integrations`}>
-          <div className="grid gap-4 md:grid-cols-1 xl:grid-cols-1">
+          <div className="grid grid-cols-2 gap-4">
             <GroupStat label="Connected integrations" value={String(project.integrations.length)} helper="Source systems and external APIs" />
           </div>
         </GroupSection>

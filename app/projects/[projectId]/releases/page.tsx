@@ -34,7 +34,48 @@ export default function ReleasesPage({ params }: { params: { projectId: string }
         href={`/projects/${currentProject.id}/releases/${release.id}`}
         className="block rounded-2xl border border-slate-200 bg-white p-4 transition hover:border-slate-300 hover:bg-slate-50"
       >
-        <div className="grid gap-4 xl:grid-cols-[1.2fr,0.95fr,0.65fr,0.85fr,1.2fr,0.55fr,1.2fr,0.7fr]">
+        <div className="flex flex-col gap-4 lg:hidden">
+          <div>
+            <div className="text-xl font-semibold text-slate-900">{release.version}</div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {release.surfaces.map((surface) => (
+                <SurfaceBadge key={surface} surface={surface} />
+              ))}
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4 text-sm text-slate-600">
+            <div>
+              <div className="font-medium text-slate-900">Status</div>
+              <div className="mt-1"><StatusBadge tone={tone as any}>{release.status ?? "old"}</StatusBadge></div>
+            </div>
+            <div>
+              <div className="font-medium text-slate-900">Deploy date</div>
+              <div className="mt-1">{release.shippedAt}</div>
+            </div>
+            <div>
+              <div className="font-medium text-slate-900">Source kind</div>
+              <div className="mt-1">{release.source?.kind ?? "unknown"}</div>
+            </div>
+            <div>
+              <div className="font-medium text-slate-900">Issue count</div>
+              <div className="mt-1">{release.jiraLinks.length}</div>
+            </div>
+            <div className="col-span-2">
+              <div className="font-medium text-slate-900">Source repository</div>
+              <div className="mt-1 break-words">{formatSourceLabel(release.source)}</div>
+            </div>
+            <div className="col-span-2">
+              <div className="font-medium text-slate-900">Deployment comment</div>
+              <div className="mt-1">{release.deploymentComment ?? release.releaseNotes}</div>
+            </div>
+            <div>
+              <div className="font-medium text-slate-900">Jira linked</div>
+              <div className="mt-1">{release.jiraLinks.length > 0 ? "Yes" : "No"}</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="hidden lg:grid lg:gap-4 xl:grid-cols-[1.2fr,0.95fr,0.65fr,0.85fr,1.2fr,0.55fr,1.2fr,0.7fr]">
           <div>
             <div className="text-sm font-semibold text-slate-900">{release.version}</div>
             <div className="mt-1 flex flex-wrap gap-2">
@@ -87,7 +128,7 @@ export default function ReleasesPage({ params }: { params: { projectId: string }
           description="Each row represents a governed release record. Open a row to inspect functionality, Jira traceability and cross-platform impact."
         />
         <section className="space-y-3">
-          <div className="card p-4">
+          <div className="card hidden p-4 lg:block">
             <div className="grid gap-4 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500 xl:grid-cols-[1.2fr,0.95fr,0.65fr,0.85fr,1.2fr,0.55fr,1.2fr,0.7fr]">
               <div>Release version / surfaces</div>
               <div>Status</div>
