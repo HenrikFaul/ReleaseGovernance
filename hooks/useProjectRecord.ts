@@ -1,32 +1,29 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { getProject } from "@/lib/mock-data";
 import { mergeProjectWithOverrides } from "@/lib/project-overrides";
-import { ProjectRecord } from "@/lib/types";
 
 export function useProjectRecord(projectId: string) {
-  const [project, setProject] = useState<ProjectRecord | undefined>(() => mergeProjectWithOverrides(projectId));
+  const [nonce, setNonce] = useState(0);
 
   useEffect(() => {
-    const sync = () => setProject(mergeProjectWithOverrides(projectId));
-    sync();
-    window.addEventListener("focus", sync);
+    const sync = () => setNonce((n) => n + 1);
     window.addEventListener("storage", sync);
+    window.addEventListener("focus", sync);
     return () => {
-      window.removeEventListener("focus", sync);
       window.removeEventListener("storage", sync);
+      window.removeEventListener("focus", sync);
     };
-  }, [projectId]);
+  }, []);
 
-  const stats = useMemo(() => {
-    if (!project) return { releasedCount: 0, unreleasedCount: 0, importedJiraCount: 0, candidateCount: 0 };
-    return {
-      releasedCount: project.releases.filter((r) => (r.releaseState ?? "released") === "released").length,
-      unreleasedCount: project.releases.filter((r) => r.releaseState === "unreleased").length,
-      importedJiraCount: project.importedJiraIssues?.length ?? 0,
-      candidateCount: project.releaseCandidates?.length ?? 0,
-    };
-  }, [project]);
+  const project = useMemo(() => {
+    const merged = mergeProjectWithOverrides(projectId);
+    return merged ?? getProject(projectId);
+  }, [projectId, nonce]);
 
-  return { project, stats, refresh: () => setProject(mergeProjectWithOverrides(projectId)) };
+  return {
+    project,
+    refresh: () => setNonce((n) => n + 1),
+  };
 }

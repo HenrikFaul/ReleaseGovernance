@@ -1,32 +1,35 @@
 # codingLessonsLearnt
 
-Mindig ezzel kell kezdeni a fejlesztést: munka előtt olvasd végig ezt a fájlt elejétől a végéig. Olvasd végig a CHANGELOG.md-t is. Az itt felsorolt hibákat nem szabad újra elkövetni. Minden új típusú hibát ehhez a fájlhoz kell hozzáappendelni, nem új fájlba írni, és nem szabad a régi tanulságokat törölni.
+Mindig ezzel kell kezdeni a fejlesztést: munka előtt olvasd végig ezt a fájlt elejétől a végéig, majd olvasd végig a CHANGELOG.md-t és a versioning mappában lévő legutóbbi business_request / ai_dev_prompt fájlokat is. A korábban dokumentált hibákat nem szabad újra elkövetni. Minden új típusú hibát ehhez a fájlhoz kell hozzáappendelni.
 
-## Kötelező javítási módszertan minden új hibánál vagy üzleti kérésnél
-1. Azonosítsd pontosan a build/runtime/log hibát.
-2. Gyűjts össze a szükséges technikai tudást megbízható dokumentációból.
-3. Válassz minimális kockázatú javítási stratégiát.
-4. Ellenőrizd, hogy a javítás nem rontja el a korábban működő funkciókat.
-5. A javítás után appendeld a tanulságot ebbe a fájlba.
-6. A CHANGELOG-ba is appendelve kerüljön be a javítás.
+## Rövid ellenőrző lista minden átadás előtt
+- [ ] Elolvastam ezt a fájlt a fejlesztési kör elején.
+- [ ] Elolvastam a CHANGELOG-ot.
+- [ ] Elolvastam a releváns versioning fájlokat.
+- [ ] A módosítás nem hozza vissza a korábbi typedRoutes / props / type export hibákat.
+- [ ] A sidebar menü megfelel a projekt nélküli és projekt-specifikus állapotoknak.
+- [ ] Az import funkció megvan és elérhető.
+- [ ] A release oldal továbbra is Vercel-szerű.
+- [ ] A push-to-jira és csv funkciók nem tűntek el.
+- [ ] A build lefutott vagy legalább célzottan ellenőriztem a módosított töréspontokat.
 
-## Kötelező szerkezet minden új bejegyzésnél
-- Tünet / log
-- Kiváltó ok
-- Javítás
-- Megelőzés
-- Ellenőrzés
+### [015] Funkcióvesztés layout javítás közben
+- **Tünet / log:** mobil layout javítás után eltűnt vagy nem volt elérhető a release auto-detection, a Jira backfill CSV letöltés és a Push to Jira.
+- **Kiváltó ok:** a fókusz túl szűken a vizuális layoutra került, és a release oldal interaktív governance funkciói nem maradtak benne az új komponensverzióban.
+- **Javítás:** a release oldal layoutját úgy kell javítani, hogy közben a release auto-generation, Jira CSV export és Push to Jira preview/apply flow is megmaradjon vagy visszakerüljön.
+- **Megelőzés:** minden layout patch előtt explicit funkció-megőrzési checklist kell a release oldalhoz: auto release, csv export, push to jira, list/detailed view, release detail link.
+- **Ellenőrzés:** mobilon és desktopon is ellenőrizni kell, hogy a gombok látszanak és a műveletek tényleg futnak.
 
-### [037] AppShell prop contractot nem szabad megsérteni
-- **Tünet / log:** `Property 'projectName' does not exist on type ...` build hiba az automation és releases oldalon.
-- **Kiváltó ok:** az `AppShell` csak `children` és opcionális `projectId` propot fogad, mégis `projectName` prop került átadásra.
-- **Javítás:** a hibás `projectName` propot el kell távolítani, és csak `projectId` maradjon átadva.
-- **Megelőzés:** komponens használat előtt mindig ellenőrizni kell az aktuális prop típust, különösen hotfix közben.
-- **Ellenőrzés:** keress rá a repo-ban az `AppShell projectName=` mintára, és szüntesd meg mindenhol.
+### [016] Mobilon túl széles stat kártyák és redundáns header
+- **Tünet / log:** mobil nézetben a dashboard kártyák egyesével, túl nagy függőleges helyet foglaltak, és a headerben duplikált információ jelent meg.
+- **Kiváltó ok:** a grid mobil breakpointon 1 oszlopos maradt, és a workspace/header blokk duplikálta a projektinformációt.
+- **Javítás:** mobilon 2 oszlopos stat-card grid kell, a fölösleges header blokkot pedig el kell távolítani.
+- **Megelőzés:** minden dashboard blokkot mobilon is külön screenshot-alapú QA-val kell ellenőrizni.
+- **Ellenőrzés:** legalább két statcard férjen el egymás mellett mobilon, és ne legyen fölösleges extra header panel.
 
-### [038] Mobile layouts must avoid duplicated chrome and single-column stat waste
-- **Tünet / log:** mobil nézetben a felső workspace header duplikálta a projektinformációt, a stat csempék indokolatlanul 1 oszlopban jelentek meg, és a release fejlécblokk feleslegesen sok helyet foglalt.
-- **Kiváltó ok:** desktop-first layout maradt aktív mobilon is, illetve a mobilra nem volt külön sűrített megjelenítés.
-- **Javítás:** el kell távolítani a redundáns project header blokkot, a stat csempéket mobilon 2 oszlopos gridbe kell tenni, és a release oldalon a táblafejlécet mobilon el kell rejteni külön mobilkártyás elrendezéssel.
-- **Megelőzés:** minden dashboard és release oldalnál külön ellenőrizni kell a mobil breakpointot, különösen a duplikált információkat és a grid oszlopok számát.
-- **Ellenőrzés:** mobil nézetben legyen 2 csempe / sor a dashboard blokkokban, a release lista ne mutasson külön üres fejlécpanelt, és legyen Projects + Project navigáció gyorsan elérhetően.
+### [017] Mobil quick-navból nem tűnhet el a Project visszalépés
+- **Tünet / log:** mobil nézetben hiányzott a Project gomb, így nehézkes lett a visszalépés a projekt főoldalára.
+- **Kiváltó ok:** a bottom navigation túl agresszíven leegyszerűsödött.
+- **Javítás:** project-specifikus oldalon legyen külön Project gyorsgomb mobilon.
+- **Megelőzés:** a bottom navnál külön ellenőrizni kell a legfontosabb visszalépési útvonalakat.
+- **Ellenőrzés:** projekt alatt mobilon látszódjon a Projects és a Project gomb is.
