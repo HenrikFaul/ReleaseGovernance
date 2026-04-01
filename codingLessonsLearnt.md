@@ -23,3 +23,18 @@ Mindig ezzel kell kezdeni a fejlesztést: munka előtt olvasd végig ezt a fájl
 - **Javítás:** a hibás `projectName` propot el kell távolítani, és csak `projectId` maradjon átadva.
 - **Megelőzés:** komponens használat előtt mindig ellenőrizni kell az aktuális prop típust, különösen hotfix közben.
 - **Ellenőrzés:** keress rá a repo-ban az `AppShell projectName=` mintára, és szüntesd meg mindenhol.
+
+
+### [038] AppShell prop contract maradék előfordulásait repo-szinten kell kiszedni
+- **Tünet / log:** `Property 'projectName' does not exist on type ...` build hiba a `traceability/page.tsx` oldalon.
+- **Kiváltó ok:** a korábbi hotfix nem futott végig a teljes repo-n, csak néhány ismert oldalt javított.
+- **Javítás:** a `traceability/page.tsx` fájlban is el kell távolítani a `projectName` propot, majd teljes repo-szintű mintakeresést kell futtatni.
+- **Megelőzés:** azonos komponens-szerződés hibánál mindig teljes mintakereséssel kell zárni a javítást, nem csak a logban elsőként látható fájlra.
+- **Ellenőrzés:** `rg -n "AppShell .*projectName=|projectName=\{" app components` ne adjon találatot.
+
+### [039] Ne hagyj hiányzó exportokat a használt helper API körül
+- **Tünet / log:** import figyelmeztetések / build hibák `approveReleaseCandidate`, `writeProjectUploadDraft`, `createProjectFromUpload`, `readCustomProjects` hiánya miatt.
+- **Kiváltó ok:** a komponensek már a runtime project upload és release candidate flow-ra hivatkoztak, de a hozzájuk tartozó helper exportok hiányoztak a `lib/project-overrides.ts` fájlból.
+- **Javítás:** a hiányzó exportokat implementálni kell minimális, működő localStorage-alapú viselkedéssel.
+- **Megelőzés:** új UI flow hozzáadása után mindig ellenőrizni kell, hogy a hivatkozott helper függvények tényleg exportálva vannak-e.
+- **Ellenőrzés:** repo build és célzott keresés az importált, de nem exportált symbolokra.

@@ -325,9 +325,9 @@ export function ProjectUploadModal({ open, onClose, onCreated }: Props) {
                 <div className="mt-3 space-y-2 text-sm text-slate-700">
                   <div className="font-medium text-slate-900">{candidate.version}</div>
                   <div>{candidate.releaseNotes}</div>
-                  <div className="text-slate-500">Repo: {candidate.source.label ?? candidate.repoUrl}</div>
-                  <div className="text-slate-500">Hosting: {candidate.hostingProvider} — {candidate.hostingSummary}</div>
-                  <div className="text-slate-500">Jira keys: {candidate.jiraKeys.join(", ") || "none detected"}</div>
+                  <div className="text-slate-500">Repo: {candidate.source.label ?? candidate.repoUrl ?? "Unknown repo"}</div>
+                  <div className="text-slate-500">Hosting: {candidate.hostingProvider ?? "unknown"} — {candidate.hostingSummary ?? "No hosting summary"}</div>
+                  <div className="text-slate-500">Jira keys: {candidate.jiraKeys?.join(", ") || "none detected"}</div>
                 </div>
               ) : <div className="mt-3 text-sm text-slate-500">No release candidate detected yet. Preview still includes Jira and integration bootstrap data.</div>}
             </div>

@@ -11,7 +11,7 @@ export default function TraceabilityPage({ params }: { params: { projectId: stri
   const backfill = summarizeBackfill(project);
 
   return (
-    <AppShell projectId={project.id} projectName={project.name}>
+    <AppShell projectId={project.id}>
       <div className="space-y-6">
         <SectionHeader eyebrow="Traceability" title={`${project.name} Jira and parity mapping`} description="Follow requirements from Jira through releases and see what still needs backfill or cross-surface follow-up." />
         <div className="grid gap-6 xl:grid-cols-[1fr,1fr]">

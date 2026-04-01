@@ -193,3 +193,165 @@ export function mergeProjectWithOverrides(projectId: string): ProjectRecord | un
     releaseCandidates: dedupeCandidates([...(base.releaseCandidates ?? []), ...(current.releaseCandidates ?? [])]),
   };
 }
+
+
+const CUSTOM_PROJECTS_KEY = "releasegovernance.customProjects";
+const PROJECT_UPLOAD_DRAFT_KEY = "releasegovernance.projectUploadDraft";
+
+type CreateProjectInput = {
+  name: string;
+  description?: string;
+  jiraProjectKey?: string;
+  repoUrl?: string;
+  hostingProvider?: "vercel" | "supabase" | "custom";
+  hostingUrl?: string;
+  jiraUrl?: string;
+  bundle: ProjectImportBundle;
+  previewCandidate?: ReleaseCandidate | null;
+};
+
+function slugifyProject(value: string) {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "project";
+}
+
+export function readProjectUploadDraft(): Record<string, unknown> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = localStorage.getItem(PROJECT_UPLOAD_DRAFT_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+export function writeProjectUploadDraft(draft: Record<string, unknown>) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(PROJECT_UPLOAD_DRAFT_KEY, JSON.stringify(draft));
+}
+
+export function readCustomProjects(): ProjectRecord[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(CUSTOM_PROJECTS_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeCustomProjects(projects: ProjectRecord[]) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(CUSTOM_PROJECTS_KEY, JSON.stringify(projects));
+}
+
+export function createProjectFromUpload(input: CreateProjectInput): ProjectRecord {
+  const slug = slugifyProject(input.name);
+  const id = `project_${slug}`;
+  const existing = readCustomProjects().filter((project) => project.id !== id);
+
+  const releases: ProjectRecord["releases"] = input.bundle.releases.length
+    ? input.bundle.releases
+    : input.previewCandidate
+      ? [{
+          id: `release_${input.previewCandidate.id}`,
+          version: input.previewCandidate.version,
+          releaseState: "unreleased" as const,
+          status: "candidate" as const,
+          surfaces: input.previewCandidate.surfaces,
+          shippedAt: input.previewCandidate.detectedAt.slice(0, 10),
+          backendChanged: input.previewCandidate.backendChanged,
+          sharedContractChanged: input.previewCandidate.sharedContractChanged,
+          schemaChanged: input.previewCandidate.schemaChanged,
+          integrationsChanged: input.previewCandidate.integrationsChanged,
+          jiraBackfillRequired: !(input.previewCandidate.jiraKeys?.length),
+          deliveredCapabilities: [],
+          releaseNotes: input.previewCandidate.releaseNotes,
+          jiraLinks: (input.previewCandidate.jiraKeys ?? []).map((key) => ({
+            key,
+            summary: "Imported from detected release candidate",
+            status: "Imported",
+            url: input.jiraUrl ? `${input.jiraUrl.replace(/\/$/, "")}/browse/${key}` : `https://example.atlassian.net/browse/${key}`,
+          })),
+          source: input.previewCandidate.source,
+          deploymentComment: input.previewCandidate.deploymentComment,
+          changelog: input.previewCandidate.changelog,
+        }]
+      : [];
+
+  const project: ProjectRecord = {
+    id,
+    tenantId: "tenant_releasegovernance",
+    name: input.name.trim(),
+    slug,
+    description: input.description?.trim() || "Imported project in governance workspace.",
+    repositories: { web: input.repoUrl || undefined },
+    jiraProjectKey: input.jiraProjectKey || undefined,
+    domain: input.hostingUrl ? input.hostingUrl.replace(/^https?:\/\//, "") : undefined,
+    releases,
+    capabilities: input.bundle.capabilities,
+    integrations: dedupe([
+      ...input.bundle.integrations,
+      ...(input.repoUrl ? [{ id: `github_${slug}`, name: "GitHub", category: "source-control", state: "connected", url: input.repoUrl, notes: "Repository linked during project upload." }] : []),
+      ...(input.hostingUrl ? [{ id: `hosting_${slug}`, name: (input.hostingProvider || "custom").toUpperCase(), category: input.hostingProvider === "supabase" ? "backend" : "deployment", state: "connected", url: input.hostingUrl, notes: "Hosting linked during project upload." }] : []),
+      ...(input.jiraUrl ? [{ id: `jira_${slug}`, name: "Jira", category: "planning", state: "connected", url: input.jiraUrl, notes: "Jira linked during project upload." }] : []),
+    ] as any),
+    parityAlerts: [],
+    importedJiraIssues: input.bundle.importedJiraIssues,
+    backfillCandidates: [],
+    releaseCandidates: input.previewCandidate ? [input.previewCandidate] : [],
+    deploymentStatus: "warning",
+    overview: {
+      applicationDescription: input.description?.trim() || `${input.name.trim()} governance import`,
+      techStack: [],
+      hostingServices: input.hostingUrl ? [input.hostingUrl] : [],
+      backendServices: input.hostingProvider === "supabase" ? ["supabase"] : [],
+      projectStructure: ["Imported through ReleaseGovernance project upload"],
+    },
+  };
+
+  writeCustomProjects([project, ...existing]);
+  return project;
+}
+
+export function approveReleaseCandidate(projectId: string, candidateId: string) {
+  const current = readProjectOverride(projectId);
+  const candidates = current.releaseCandidates ?? [];
+  const candidate = candidates.find((item) => item.id === candidateId);
+  if (!candidate) return;
+
+  const release = {
+    id: `release_${candidate.id}`,
+    version: candidate.version,
+    status: "current" as const,
+    releaseState: "released" as const,
+    surfaces: candidate.surfaces,
+    shippedAt: candidate.detectedAt.slice(0, 10),
+    backendChanged: candidate.backendChanged,
+    sharedContractChanged: candidate.sharedContractChanged,
+    schemaChanged: candidate.schemaChanged,
+    integrationsChanged: candidate.integrationsChanged,
+    jiraBackfillRequired: !(candidate.jiraKeys?.length),
+    deliveredCapabilities: [],
+    releaseNotes: candidate.releaseNotes,
+    jiraLinks: (candidate.jiraKeys ?? []).map((key) => ({
+      key,
+      summary: "Approved from release candidate",
+      status: "Imported",
+      url: `https://example.atlassian.net/browse/${key}`,
+    })),
+    source: candidate.source,
+    deploymentComment: candidate.deploymentComment,
+    changelog: candidate.changelog,
+  };
+
+  writeProjectOverride(projectId, {
+    ...current,
+    releases: dedupe([release as any, ...(current.releases ?? [])]),
+    releaseCandidates: candidates.filter((item) => item.id !== candidateId),
+  });
+}

@@ -52,6 +52,18 @@ export interface ReleaseChangelog {
   excerpt: string[];
 }
 
+export interface ReleaseChangelogSection {
+  heading: string;
+  bullets: string[];
+  prose: string[];
+}
+
+export interface ReleaseChangelogExcerpt {
+  title: string;
+  date?: string;
+  sections: ReleaseChangelogSection[];
+}
+
 export interface ReleaseItem {
   id: string;
   version: string;
@@ -110,6 +122,13 @@ export interface BackfillCandidate {
   recommendedRelease?: string;
 }
 
+export interface ReleaseCandidateCheck {
+  key: string;
+  label: string;
+  value?: string;
+  present: boolean;
+}
+
 export interface ReleaseCandidate {
   id: string;
   version: string;
@@ -125,6 +144,11 @@ export interface ReleaseCandidate {
   changelog?: ReleaseChangelog;
   commitMessage?: string;
   commitUrl?: string;
+  jiraKeys?: string[];
+  repoUrl?: string;
+  hostingProvider?: "vercel" | "supabase" | "custom" | "unknown";
+  hostingSummary?: string;
+  requiredChecks?: ReleaseCandidateCheck[];
 }
 
 export interface ProjectOverview {
