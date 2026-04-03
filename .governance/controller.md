@@ -31,3 +31,15 @@ This repository is governed by the central pack from `HenrikFaul/governance`.
 ## Additional local enforcement
 - Local `CHANGELOG.md` files must remain append-only.
 - Common admin capability changes must be sourced from the canonical `HenrikFaul/governance/common_admin/` model before local rollout.
+
+## Common Admin canonical-source rule
+- The reusable admin capability model must live first in `common_admin/` inside the `HenrikFaul/governance` repository.
+- This repository must implement local admin UI changes by reading the canonical `common_admin` model before coding.
+- If the shared admin capability model changes, update the canonical governance files first, then roll the change into this repository.
+- Do not create divergent parallel admin models when the capability is intentionally shared.
+
+## Append-only changelog rule
+- `CHANGELOG.md` is an append-only historical ledger.
+- Never replace, rewrite, truncate, reorder destructively, or drop earlier release history.
+- New deliveries must be added as new sections while preserving all previous entries verbatim.
+- If a changelog correction is required, fix it by appending a corrective entry instead of deleting historical content.
