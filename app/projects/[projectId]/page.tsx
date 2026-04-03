@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
+import { SectionHeader, StatCard, StatusBadge } from "@/components/ui";
 import { useProjectRecord } from "@/hooks/useProjectRecord";
 
 export default function ProjectDashboardPage({ params }: { params: { projectId: string } }) {
@@ -10,95 +11,92 @@ export default function ProjectDashboardPage({ params }: { params: { projectId: 
   if (!project) {
     return (
       <AppShell projectId={params.projectId}>
-        <div className="rounded-[28px] bg-white p-6 shadow-sm">Project not found.</div>
+        <div className="card p-6">Project not found.</div>
       </AppShell>
     );
   }
 
   const trackedReleases = project.releases.filter((release: any) => release.status !== "unreleased").length;
   const unreleasedGroups = project.releases.filter((release: any) => release.status === "unreleased").length;
-  const backfillCandidates = project.backfillCandidates?.length ?? 0;
   const releaseCandidates = project.releaseCandidates?.length ?? 0;
   const capabilities = project.capabilities?.length ?? 0;
-  const parityAlerts = project.parityAlerts?.length ?? 0;
+  const parityAlerts = project.parityAlerts?.filter((item: any) => item.state !== "resolved").length ?? 0;
   const integrations = project.integrations?.length ?? 0;
-
-  const statCard = (label: string, value: number, helper: string) => (
-    <div className="rounded-[28px] border border-slate-200 bg-white p-5">
-      <div className="text-base text-slate-500">{label}</div>
-      <div className="mt-3 text-5xl font-semibold text-slate-950">{value}</div>
-      <div className="mt-3 text-base text-slate-500">{helper}</div>
-    </div>
-  );
+  const currentRelease = project.releases.find((release: any) => release.status === "current");
 
   return (
     <AppShell projectId={project.id}>
       <div className="space-y-6">
-        <section className="rounded-[32px] bg-white p-6 shadow-sm md:p-8">
-          <div className="inline-flex rounded-full border border-brand-100 bg-brand-50 px-4 py-2 text-[11px] uppercase tracking-[0.28em] text-brand-700">
-            Project dashboard
-          </div>
-          <h1 className="mt-5 text-4xl font-semibold tracking-tight text-slate-950 md:text-5xl">{project.name}</h1>
-          <p className="mt-4 max-w-4xl text-lg leading-8 text-slate-600">{project.description}</p>
-        </section>
+        <SectionHeader
+          eyebrow="Project overview"
+          title={project.name}
+          description={project.description}
+          actions={<StatusBadge tone={project.deploymentStatus === "healthy" ? "success" : project.deploymentStatus === "warning" ? "warning" : "danger"}>{project.deploymentStatus}</StatusBadge>}
+        />
 
-        <section className="rounded-[32px] bg-white p-5 shadow-sm md:p-6">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h2 className="text-3xl font-semibold text-slate-950">Release dashboard</h2>
-              <p className="mt-2 text-base text-slate-600">Tracked release posture, unreleased scope and Jira backfill readiness.</p>
-            </div>
-            <Link href={`/projects/${project.id}/releases`} className="rounded-[28px] bg-brand-600 px-6 py-4 text-lg font-medium text-white">
-              Open release dashboard
-            </Link>
-          </div>
-          <div className="mt-6 grid grid-cols-2 gap-4 xl:grid-cols-4">
-            {statCard("Tracked releases", trackedReleases, "Deployed release rows")}
-            {statCard("Unreleased groups", unreleasedGroups, "Specified but not yet deployed")}
-            {statCard("Backfill candidates", backfillCandidates, "Deployed without Jira")}
-            {statCard("Release candidates", releaseCandidates, "Awaiting approval")}
-          </div>
-        </section>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <StatCard label="Tracked releases" value={String(trackedReleases)} helper="Deployed release rows in governance" />
+          <StatCard label="Unreleased groups" value={String(unreleasedGroups)} helper="Specified but not yet deployed scope" />
+          <StatCard label="Release candidates" value={String(releaseCandidates)} helper="Awaiting approval or review" />
+          <StatCard label="Open parity alerts" value={String(parityAlerts)} helper="Cross-surface follow-up required" />
+        </div>
 
-        <section className="rounded-[32px] bg-white p-5 shadow-sm md:p-6">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h2 className="text-3xl font-semibold text-slate-950">Capabilities dashboard</h2>
-              <p className="mt-2 text-base text-slate-600">Capability inventory and open cross-surface parity concerns.</p>
-            </div>
-            <Link href={`/projects/${project.id}/capabilities`} className="rounded-[28px] bg-brand-600 px-6 py-4 text-lg font-medium text-white">
-              Open capabilities dashboard
-            </Link>
-          </div>
-          <div className="mt-6 grid grid-cols-2 gap-4 md:max-w-4xl">
-            {statCard("Capabilities", capabilities, "Tracked independently from commits")}
-            {statCard("Open parity alerts", parityAlerts, "Cross-surface follow-up required")}
-          </div>
-        </section>
-
-        <section className="rounded-[32px] bg-white p-5 shadow-sm md:p-6">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h2 className="text-3xl font-semibold text-slate-950">Integrations dashboard</h2>
-              <p className="mt-2 text-base text-slate-600">Source systems, APIs and hosting dependencies connected to this project.</p>
-            </div>
-            <Link href={`/projects/${project.id}/integrations`} className="rounded-[28px] bg-brand-600 px-6 py-4 text-lg font-medium text-white">
-              Open integrations dashboard
-            </Link>
-          </div>
-          <div className="mt-6 grid grid-cols-2 gap-4 md:max-w-4xl">
-            {statCard("Connected integrations", integrations, "Source systems and external APIs")}
-            <div className="rounded-[28px] border border-slate-200 bg-white p-5">
-              <div className="text-base text-slate-500">Current release posture</div>
-              <div className="mt-3 text-2xl font-semibold text-slate-950">
-                {project.releases.find((release: any) => release.status === "current")?.version ?? "No current release"}
+        <div className="grid gap-4 xl:grid-cols-[1.3fr_0.9fr]">
+          <section className="card p-6 sm:p-7">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-semibold tracking-tight text-slate-950">Governance work areas</h2>
+                <p className="mt-3 text-sm leading-7 text-slate-600">Move between the main project dashboards without losing context.</p>
               </div>
-              <div className="mt-3 text-base leading-7 text-slate-500">
-                {project.releases.find((release: any) => release.status === "current")?.releaseNotes ?? "No release summary available."}
+              <StatusBadge tone="info">workspace-linked</StatusBadge>
+            </div>
+            <div className="mt-6 grid gap-3 md:grid-cols-2">
+              <Link href={`/projects/${project.id}/releases`} className="panel-subtle p-5 transition hover:border-brand-200 hover:bg-white">
+                <div className="text-lg font-semibold text-slate-950">Release dashboard</div>
+                <p className="mt-2 text-sm leading-6 text-slate-600">Inspect current, candidate and unreleased release records.</p>
+              </Link>
+              <Link href={`/projects/${project.id}/capabilities`} className="panel-subtle p-5 transition hover:border-brand-200 hover:bg-white">
+                <div className="text-lg font-semibold text-slate-950">Capabilities dashboard</div>
+                <p className="mt-2 text-sm leading-6 text-slate-600">Follow capability posture and cross-surface parity concerns.</p>
+              </Link>
+              <Link href={`/projects/${project.id}/integrations`} className="panel-subtle p-5 transition hover:border-brand-200 hover:bg-white">
+                <div className="text-lg font-semibold text-slate-950">Integrations dashboard</div>
+                <p className="mt-2 text-sm leading-6 text-slate-600">Review toolchain, hosting and external dependencies.</p>
+              </Link>
+              <Link href={`/projects/${project.id}/import`} className="panel-subtle p-5 transition hover:border-brand-200 hover:bg-white">
+                <div className="text-lg font-semibold text-slate-950">Import studio</div>
+                <p className="mt-2 text-sm leading-6 text-slate-600">Import Jira, Markdown, CSV and Excel governance inputs.</p>
+              </Link>
+            </div>
+          </section>
+
+          <section className="card p-6 sm:p-7">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-semibold tracking-tight text-slate-950">Current posture</h2>
+                <p className="mt-3 text-sm leading-7 text-slate-600">Quick summary of the currently governed release state.</p>
+              </div>
+              <StatusBadge tone="neutral">{integrations} integrations</StatusBadge>
+            </div>
+            <div className="mt-6 space-y-4">
+              <div className="panel-subtle p-5">
+                <div className="text-sm text-slate-500">Current release</div>
+                <div className="mt-2 text-2xl font-semibold text-slate-950">{currentRelease?.version ?? "No current release"}</div>
+                <p className="mt-3 text-sm leading-6 text-slate-600">{currentRelease?.releaseNotes ?? "No release summary available."}</p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="panel-subtle p-5">
+                  <div className="text-sm text-slate-500">Capabilities</div>
+                  <div className="mt-2 text-2xl font-semibold text-slate-950">{capabilities}</div>
+                </div>
+                <div className="panel-subtle p-5">
+                  <div className="text-sm text-slate-500">Integrations</div>
+                  <div className="mt-2 text-2xl font-semibold text-slate-950">{integrations}</div>
+                </div>
               </div>
             </div>
-          </div>
-        </section>
+          </section>
+        </div>
       </div>
     </AppShell>
   );
