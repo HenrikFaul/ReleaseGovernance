@@ -11,3 +11,8 @@ git subtree add --prefix .governance https://github.com/HenrikFaul/governance.gi
 ```bash
 node .governance/tools/generate-instructions.mjs
 ```
+
+
+## Append-only governance sync note
+When the shared governance pack changes, pull the updated `.governance/` subtree and preserve append-only local changelog history.
+Do not replace or truncate historical `CHANGELOG.md` content during governance sync work.

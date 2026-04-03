@@ -26,3 +26,8 @@ This repository is governed by the central pack from `HenrikFaul/governance`.
 - Shared versioning rules: `.governance/versioning-guidelines.md`
 - Shared prompt wording: `.governance/business_process_automation_prompts.md`
 - Local lessons append target: `codingLessonsLearnt.local.md`
+
+
+## Additional local enforcement
+- Local `CHANGELOG.md` files must remain append-only.
+- Common admin capability changes must be sourced from the canonical `HenrikFaul/governance/common_admin/` model before local rollout.
