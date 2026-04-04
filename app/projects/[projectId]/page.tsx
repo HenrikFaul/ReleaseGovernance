@@ -38,7 +38,7 @@ export default function ProjectDashboardPage({ params }: { params: { projectId: 
           }
         />
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4 grid-cols-2 xl:grid-cols-4">
           <StatCard label="Tracked releases" value={String(trackedReleases)} helper="Deployed release rows in governance" />
           <StatCard label="Unreleased groups" value={String(unreleasedGroups)} helper="Specified but not yet deployed scope" />
           <StatCard label="Release candidates" value={String(releaseCandidates)} helper="Awaiting approval or review" />

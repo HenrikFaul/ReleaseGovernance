@@ -1,1 +1,11 @@
-export { default } from "../../2026-04-02/packages/shell-ia/workspace-shell";
+import React, { PropsWithChildren, ReactNode } from "react";
+
+type WorkspaceShellProps = PropsWithChildren<{
+  projectId?: string;
+  title?: string;
+  statusBadge?: ReactNode;
+}>;
+
+export default function WorkspaceShell({ children }: WorkspaceShellProps) {
+  return React.createElement(React.Fragment, null, children);
+}

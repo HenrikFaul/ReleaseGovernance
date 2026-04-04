@@ -31,7 +31,7 @@ function mobileNavClass(active: boolean) {
 
 function resolveSectionLabel(pathname: string, projectId?: string) {
   if (!projectId) return "Workspace";
-  if (pathname === `/projects/${projectId}`) return "Overview";
+  if (pathname === `/projects/${projectId}`) return "Project";
   if (pathname.includes("/releases")) return "Releases";
   if (pathname.includes("/capabilities")) return "Capabilities";
   if (pathname.includes("/integrations")) return "Integrations";
@@ -52,7 +52,7 @@ export function AppShell({ children, projectId }: AppShellProps) {
 
   const projectNav: NavItem[] = projectId
     ? [
-        { href: `/projects/${projectId}`, label: "Overview", shortLabel: "Overview" },
+        { href: `/projects/${projectId}`, label: "Project overview", shortLabel: "Project" },
         { href: `/projects/${projectId}/releases`, label: "Releases", shortLabel: "Releases" },
         { href: `/projects/${projectId}/capabilities`, label: "Capabilities", shortLabel: "Caps" },
         { href: `/projects/${projectId}/integrations`, label: "Integrations", shortLabel: "Integr." },
@@ -64,7 +64,7 @@ export function AppShell({ children, projectId }: AppShellProps) {
   const mobileNav: NavItem[] = projectId
     ? [
         { href: "/projects", label: "Projects", shortLabel: "Projects" },
-        { href: `/projects/${projectId}`, label: "Overview", shortLabel: "Overview" },
+        { href: `/projects/${projectId}`, label: "Project", shortLabel: "Project" },
         { href: `/projects/${projectId}/releases`, label: "Releases", shortLabel: "Releases" },
         { href: `/projects/${projectId}/capabilities`, label: "Capabilities", shortLabel: "Caps" },
         { href: `/projects/${projectId}/import`, label: "Import", shortLabel: "Import" },
