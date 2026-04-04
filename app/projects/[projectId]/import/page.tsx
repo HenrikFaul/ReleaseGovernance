@@ -9,7 +9,7 @@ export default function ImportPage({ params }: { params: { projectId: string } }
         <SectionHeader
           eyebrow="Import studio"
           title="Import releases, capabilities, integrations and Jira work"
-          description="Upload Markdown, CSV or Excel inventories, or import Jira issues by URL, project URL, base URL + project key, or JQL URL. Project Upload for brand new projects now lives on the workspace Projects page under Add a new project."
+          description="Upload Markdown, CSV or Excel inventories, or import Jira issues by URL, project URL, base URL plus project key, or JQL URL."
         />
         <ImportStudio projectId={params.projectId} />
       </div>

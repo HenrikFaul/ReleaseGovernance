@@ -11,7 +11,12 @@ export default function IntegrationsPage({ params }: { params: { projectId: stri
   return (
     <AppShell projectId={project.id}>
       <div className="space-y-6">
-        <SectionHeader eyebrow="Integrations dashboard" title={`${project.name} toolchain and API registry`} description="Connected source systems, deployment surfaces and externally governed services are grouped here." />
+        <SectionHeader
+          eyebrow="Integrations"
+          title={`${project.name} toolchain and API registry`}
+          description="Connected source systems, deployment surfaces and externally governed services are grouped here."
+          actions={<StatusBadge tone="neutral">{project.integrations.length} total</StatusBadge>}
+        />
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {project.integrations.map((integration) => (
             <div key={integration.id} className="card p-6">
@@ -20,7 +25,9 @@ export default function IntegrationsPage({ params }: { params: { projectId: stri
                   <div className="text-lg font-semibold text-slate-900">{integration.name}</div>
                   <div className="mt-1 text-sm text-slate-500">{integration.category}</div>
                 </div>
-                <StatusBadge tone={integration.state === "connected" ? "success" : integration.state === "attention" ? "warning" : "info"}>{integration.state}</StatusBadge>
+                <StatusBadge tone={integration.state === "connected" ? "success" : integration.state === "attention" ? "warning" : "info"}>
+                  {integration.state}
+                </StatusBadge>
               </div>
               {integration.notes ? <p className="mt-3 text-sm text-slate-600">{integration.notes}</p> : null}
               {integration.url ? <div className="mt-3 text-xs text-brand-700 break-all">{integration.url}</div> : null}
