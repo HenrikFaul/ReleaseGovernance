@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { useProjectRecord } from "@/hooks/useProjectRecord";
-import { addReleaseCandidate, readProjectSettings, writeProjectOverride } from "@/lib/project-overrides";
+import { summarizeBackfill } from "@/lib/backfill";
+import { addReleaseCandidate, approveReleaseCandidate, readProjectSettings, writeProjectOverride } from "@/lib/project-overrides";
 
 type PushDraft = {
   releaseId: string;
@@ -35,7 +36,7 @@ function download(filename: string, content: string, type: string) {
 }
 
 function csvEscape(value: unknown) {
-  return `\"${String(value ?? "").replaceAll('"', '""')}\"`;
+  return `"${String(value ?? "").replaceAll('"', '""')}"`;
 }
 
 export default function ReleasesPage({ params }: { params: { projectId: string } }) {
@@ -46,6 +47,18 @@ export default function ReleasesPage({ params }: { params: { projectId: string }
   const [showPushPreview, setShowPushPreview] = useState(false);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
+
+  const releases = useMemo(() => project?.releases ?? [], [project]);
+  const deployed = useMemo(() => releases.filter((release: any) => release.status !== "unreleased"), [releases]);
+  const unreleased = useMemo(() => releases.filter((release: any) => release.status === "unreleased"), [releases]);
+  const jiraLessReleases = useMemo(() => releases.filter((release: any) => !release.jiraLinks?.length), [releases]);
+  const backfill = useMemo(() => (project ? summarizeBackfill(project) : { unresolved: [], resolved: [], csvRows: [] }), [project]);
+  const releaseCandidates = useMemo(() => project?.releaseCandidates ?? [], [project]);
+  const selectedReleases = useMemo(() => jiraLessReleases.filter((release: any) => selected.includes(release.id)), [jiraLessReleases, selected]);
+  const latestReleaseDate = useMemo(() => {
+    const shippedDates = releases.map((release: any) => release.shippedAt).filter(Boolean).sort();
+    return shippedDates.length ? shippedDates[shippedDates.length - 1] : undefined;
+  }, [releases]);
 
   useEffect(() => {
     if (!project) return;
@@ -68,6 +81,7 @@ export default function ReleasesPage({ params }: { params: { projectId: string }
             hostingProvider: settings.hostingProvider,
             hostingUrl: settings.hostingUrl,
             hostingApiKey: settings.hostingApiKey || "",
+            latestReleaseDate,
           }),
         });
 
@@ -82,7 +96,7 @@ export default function ReleasesPage({ params }: { params: { projectId: string }
           refresh();
         }
       } catch {
-        // silent, because this is automatic detection
+        // automatic detection stays silent
       }
     };
 
@@ -90,14 +104,7 @@ export default function ReleasesPage({ params }: { params: { projectId: string }
     return () => {
       cancelled = true;
     };
-  }, [project?.id, project?.slug, project?.jiraProjectKey, refresh]);
-
-  const releases = project?.releases ?? [];
-  const deployed = releases.filter((release: any) => release.status !== "unreleased");
-  const unreleased = releases.filter((release: any) => release.status === "unreleased");
-  const jiraLessReleases = releases.filter((release: any) => !release.jiraLinks?.length);
-
-  const selectedReleases = jiraLessReleases.filter((release: any) => selected.includes(release.id));
+  }, [project?.id, project?.slug, project?.jiraProjectKey, project?.releaseCandidates, project?.releases, latestReleaseDate, refresh]);
 
   if (!project) {
     return (
@@ -119,13 +126,15 @@ export default function ReleasesPage({ params }: { params: { projectId: string }
       "Labels",
       "Parent key",
     ];
-    const rows = jiraLessReleases.map((release: any) => [
+    const backfillRows = backfill.csvRows.map((row) => [row.summary, row.issueType, row.description, row.labels, row.parent]);
+    const releaseRows = jiraLessReleases.map((release: any) => [
       release.version,
       "Story",
       release.releaseNotes || release.deploymentComment || `${release.version} release import`,
       ["releasegovernance", `release:${release.version}`].join(" "),
       project.jiraProjectKey ? `${project.jiraProjectKey}-1` : "",
     ]);
+    const rows = backfillRows.length ? backfillRows : releaseRows;
     const csv = [header, ...rows].map((row) => row.map(csvEscape).join(",")).join("\n");
     download(`${project.slug}-jira-backfill.csv`, csv, "text/csv;charset=utf-8");
     setStatus(`Exported ${rows.length} Jira-compatible CSV row(s).`);
@@ -220,6 +229,13 @@ export default function ReleasesPage({ params }: { params: { projectId: string }
     }
   };
 
+  const handleApproveCandidate = (candidateId: string) => {
+    approveReleaseCandidate(project.id, candidateId);
+    refresh();
+    setStatus("Release candidate approved and added to governed releases.");
+    setError("");
+  };
+
   const renderDesktopHeader = (
     <div className="hidden rounded-[28px] border border-slate-200 bg-white px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500 md:grid md:grid-cols-[1.25fr_0.8fr_0.8fr_0.75fr_1.1fr_0.55fr_1.1fr_0.5fr]">
       <div>Release version / surfaces</div>
@@ -270,7 +286,7 @@ export default function ReleasesPage({ params }: { params: { projectId: string }
           </div>
           <div>
             <div className="text-slate-500">Source repository</div>
-            <div className="mt-1 font-medium text-slate-950 break-words">{formatSourceLabel(release.source)}</div>
+            <div className="mt-1 break-words font-medium text-slate-950">{formatSourceLabel(release.source)}</div>
           </div>
           <div>
             <div className="text-slate-500">Issue count</div>
@@ -278,7 +294,7 @@ export default function ReleasesPage({ params }: { params: { projectId: string }
           </div>
           <div>
             <div className="text-slate-500">Deployment comment</div>
-            <div className="mt-1 font-medium text-slate-950 break-words">{release.deploymentComment ?? release.releaseNotes ?? "—"}</div>
+            <div className="mt-1 break-words font-medium text-slate-950">{release.deploymentComment ?? release.releaseNotes ?? "—"}</div>
           </div>
           <div>
             <div className="text-slate-500">Jira linked</div>
@@ -316,6 +332,83 @@ export default function ReleasesPage({ params }: { params: { projectId: string }
             </button>
           </div>
         </section>
+
+        {releaseCandidates.length ? (
+          <section className="rounded-[32px] bg-white p-6 shadow-sm md:p-8">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <h2 className="text-3xl font-semibold text-slate-950">Release candidates</h2>
+                <p className="mt-2 text-base text-slate-600">Auto-detected deploys or commits appear here first and can be approved into the governed release list.</p>
+              </div>
+              <div className="rounded-full bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700">{releaseCandidates.length} detected</div>
+            </div>
+            <div className="mt-6 grid gap-4 lg:grid-cols-2">
+              {releaseCandidates.map((candidate: any) => (
+                <div key={candidate.id} className="rounded-[28px] border border-slate-200 p-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <div className="text-2xl font-semibold text-slate-950">{candidate.version}</div>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {(candidate.surfaces ?? []).map((surface: string) => (
+                          <span key={surface} className="rounded-full border border-brand-100 bg-brand-50 px-3 py-1 text-sm font-medium text-brand-700">
+                            {surface}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <button onClick={() => handleApproveCandidate(candidate.id)} className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white">
+                      Approve
+                    </button>
+                  </div>
+                  <div className="mt-5 grid gap-3 text-sm text-slate-700 sm:grid-cols-2">
+                    <div>
+                      <div className="text-slate-500">Detected at</div>
+                      <div className="mt-1 font-medium text-slate-950">{candidate.detectedAt}</div>
+                    </div>
+                    <div>
+                      <div className="text-slate-500">Source</div>
+                      <div className="mt-1 font-medium text-slate-950">{formatSourceLabel(candidate.source)}</div>
+                    </div>
+                  </div>
+                  <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
+                    <div className="font-medium text-slate-950">Deployment comment</div>
+                    <div className="mt-2">{candidate.deploymentComment ?? candidate.releaseNotes ?? "No deployment comment recorded."}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {backfill.unresolved.length ? (
+          <section className="rounded-[32px] bg-white p-6 shadow-sm md:p-8">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <h2 className="text-3xl font-semibold text-slate-950">Backfill candidates</h2>
+                <p className="mt-2 text-base text-slate-600">These rows still need Jira backfill. The CSV export now prioritizes these unresolved candidates.</p>
+              </div>
+              <div className="rounded-full bg-amber-50 px-4 py-2 text-sm font-medium text-amber-700">{backfill.unresolved.length} unresolved</div>
+            </div>
+            <div className="mt-6 grid gap-4 lg:grid-cols-2">
+              {backfill.unresolved.map((candidate: any) => (
+                <div key={candidate.id} className="rounded-[28px] border border-slate-200 p-5">
+                  <div className="text-lg font-semibold text-slate-950">{candidate.summary}</div>
+                  <div className="mt-2 text-sm leading-7 text-slate-600">{candidate.description}</div>
+                  <div className="mt-4 grid gap-3 text-sm text-slate-700 sm:grid-cols-2">
+                    <div>
+                      <div className="text-slate-500">Issue type</div>
+                      <div className="mt-1 font-medium text-slate-950">{candidate.issueType}</div>
+                    </div>
+                    <div>
+                      <div className="text-slate-500">Parent</div>
+                      <div className="mt-1 font-medium text-slate-950">{candidate.parent}</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
 
         {showPushPreview ? (
           <section className="rounded-[32px] bg-white p-6 shadow-sm md:p-8">

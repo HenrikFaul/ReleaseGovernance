@@ -175,7 +175,7 @@ export function appendBackfillCandidates(projectId: string, candidates: Backfill
 }
 
 export function mergeProjectWithOverrides(projectId: string): ProjectRecord | undefined {
-  const base = getProject(projectId);
+  const base = readCustomProjects().find((project) => project.id === projectId) ?? getProject(projectId);
   if (!base) return undefined;
   const current = readProjectOverride(projectId);
   const importedJiraIssues = dedupeJira([...(base.importedJiraIssues ?? []), ...(current.importedJiraIssues ?? [])]);

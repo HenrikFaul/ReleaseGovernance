@@ -1,20 +1,26 @@
-import { notFound } from "next/navigation";
+"use client";
+
 import { AppShell } from "@/components/app-shell";
 import { SectionHeader } from "@/components/ui";
-import { getProject } from "@/lib/mock-data";
+import { useProjectRecord } from "@/hooks/useProjectRecord";
 
 export default function AutomationPage({ params }: { params: { projectId: string } }) {
-  const project = getProject(params.projectId);
-  if (!project) return notFound();
+  const { project } = useProjectRecord(params.projectId);
 
-  const currentProject = project;
+  if (!project) {
+    return (
+      <AppShell projectId={params.projectId}>
+        <div className="card p-6">Project not found.</div>
+      </AppShell>
+    );
+  }
 
   return (
-    <AppShell projectId={currentProject.id}>
+    <AppShell projectId={project.id}>
       <div className="space-y-6">
         <SectionHeader
           eyebrow="Automation"
-          title={`${currentProject.name} starter governance kit`}
+          title={`${project.name} starter governance kit`}
           description="Policy files, CI templates and automation rules that make governance enforceable instead of optional."
         />
         <div className="grid gap-4 md:grid-cols-2">

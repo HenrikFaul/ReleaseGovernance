@@ -597,3 +597,39 @@ Required practice:
 2. If delivery artifact imports point outside their actual folder structure, add build-safe alias modules or keep the artifacts out of typechecked source scope.
 3. Treat `ai-delivery` code artifacts as potentially typechecked unless proven otherwise.
 4. When a preview branch starts failing repeatedly, diagnose the first real module-resolution or typecheck error instead of assuming the number of commits is the root cause.
+
+### [040] Release candidate rows can exist in storage without appearing on the release page
+- **Tünet:** új deploy / commit után a release detection létrehoz release candidate rekordot, de a release oldalon nem jelenik meg új sor.
+- **Gyökérok:** a detection logika a `releaseCandidates` tömböt frissítette, miközben a release UI csak a `releases` listát renderelte.
+- **Javítás:** a release dashboardnak külön, első osztályú szekcióban kell megjelenítenie a `releaseCandidates` elemeket, és jóváhagyási művelettel kell tudnia azokat governed release-szé alakítani.
+- **Megelőzés:** ha egy új állapot külön adattárolóba kerül, mindig ellenőrizni kell, hogy van-e hozzá tényleges UI kirajzolás és user action.
+- **Ellenőrzés:** release detection után a candidate szekcióban ténylegesen látszódjon az új elem, és az approve művelet után kerüljön át a governed release listába.
+
+_Első azonosított forrásidő: 2026-04-06 | Forrásvonal: jelen fejlesztési kör_
+
+### [041] Jira CSV exportnál az unresolved backfill lista az elsődleges forrás
+- **Tünet:** a Download Jira CSV 0 soros vagy félrevezetően üres lehetett, miközben tényleges backfill igény létezett.
+- **Gyökérok:** az export kizárólag Jira-link nélküli release sorokból épült, nem a kanonikus unresolved `backfillCandidates` listából.
+- **Javítás:** exportnál először az unresolved backfill candidate-ekből kell CSV-t képezni, és csak fallbackként szabad Jira-less release sorokra támaszkodni.
+- **Megelőzés:** exportnál mindig a valódi üzleti backlog-forrást kell elsődlegessé tenni, nem a UI-ban éppen látható egyik részhalmazt.
+- **Ellenőrzés:** unresolved backfill candidate-ek megléte esetén a CSV export ne legyen üres.
+
+_Első azonosított forrásidő: 2026-04-06 | Forrásvonal: jelen fejlesztési kör_
+
+### [042] Runtime létrehozott projektek nem támaszkodhatnak seed-only route feloldásra
+- **Tünet:** a workspace listában látható volt a feltöltéssel létrehozott projekt, de egyes részletes oldalak vagy a shell fejléc nem tudta ugyanazt a projektet feloldani.
+- **Gyökérok:** a workspace hook már olvasta a localStorage-s custom projekteket, de néhány route és layout továbbra is csak a seed `getProject()` forrást használta.
+- **Javítás:** a merged project feloldásnál a custom projekteknek ugyanúgy részt kell venniük a route/shell lookupban, mint a seed projekteknek.
+- **Megelőzés:** ha a rendszer runtime-ban is tud új entitást létrehozni, akkor minden részletes oldalnál és közös layoutnál tilos seed-only adatforrásra hagyatkozni.
+- **Ellenőrzés:** upload/import után a projekt dashboard, automation oldal és detail route-ok is ugyanazt a projektet oldják fel.
+
+_Első azonosított forrásidő: 2026-04-06 | Forrásvonal: jelen fejlesztési kör_
+
+### [043] Release detail page must use merged governed state
+- **Tünet:** importált vagy release candidate-ből jóváhagyott release rekord nem mindig volt megnyitható a detail oldalon.
+- **Gyökérok:** a release detail page seed-only project lookupkal működött, így nem látta a runtime override-okkal bővített release-listát.
+- **Javítás:** a detail oldalnak ugyanazt a merged governed state-et kell használnia, mint a listaoldalnak.
+- **Megelőzés:** override-olt governance entitásokhoz tartozó detail route-oknál mindig ugyanazt a merged adatforrást kell használni, mint a listanézetben.
+- **Ellenőrzés:** approve/import után az új release detail oldala közvetlen linken is megnyitható legyen.
+
+_Első azonosított forrásidő: 2026-04-06 | Forrásvonal: jelen fejlesztési kör_

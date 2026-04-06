@@ -1,14 +1,23 @@
+"use client";
+
 import Link from "next/link";
-import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { SectionHeader, StatusBadge, SurfaceBadge } from "@/components/ui";
+import { useProjectRecord } from "@/hooks/useProjectRecord";
 import { evaluateReleaseImpact } from "@/lib/impact-engine";
-import { getProject } from "@/lib/mock-data";
 
 export default function ReleaseDetailPage({ params }: { params: { projectId: string; releaseId: string } }) {
-  const project = getProject(params.projectId);
+  const { project } = useProjectRecord(params.projectId);
   const release = project?.releases.find((item) => item.id === params.releaseId);
-  if (!project || !release) return notFound();
+
+  if (!project || !release) {
+    return (
+      <AppShell projectId={params.projectId}>
+        <div className="card p-6">Release not found.</div>
+      </AppShell>
+    );
+  }
+
   const impact = evaluateReleaseImpact(release);
 
   const deliveredCapabilityRecords = release.deliveredCapabilities
@@ -80,7 +89,7 @@ export default function ReleaseDetailPage({ params }: { params: { projectId: str
           <section className="card p-6">
             <h3 className="text-lg font-semibold text-slate-900">Jira traceability</h3>
             <div className="mt-4 space-y-3">
-              {release.jiraLinks.map((jira) => (
+              {release.jiraLinks.length ? release.jiraLinks.map((jira) => (
                 <a key={jira.key} href={jira.url} className="block rounded-2xl border border-slate-200 p-4 hover:bg-slate-50">
                   <div className="flex items-start gap-3">
                     <span className="shrink-0 rounded-xl bg-violet-50 px-3 py-1 text-sm font-semibold text-violet-700">{jira.key}</span>
@@ -90,7 +99,7 @@ export default function ReleaseDetailPage({ params }: { params: { projectId: str
                     </div>
                   </div>
                 </a>
-              ))}
+              )) : <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">No Jira traceability linked yet.</div>}
             </div>
           </section>
         </div>
