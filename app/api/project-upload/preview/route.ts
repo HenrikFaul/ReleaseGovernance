@@ -44,19 +44,19 @@ export async function POST(request: NextRequest) {
       }
       bundle.importedJiraIssues = issues;
       bundle.capabilities = issues.map(issueToCapability);
-      bundle.integrations.push({ id: `integration_jira_${effectiveProjectKey.toLowerCase()}`, name: "Jira", category: "planning", state: "connected", notes: `Imported ${issues.length} issue(s) for ${effectiveProjectKey}.`, url: body.jiraUrl || base });
+      bundle.integrations.push({ id: `integration_jira_${effectiveProjectKey.toLowerCase()}`, canonicalKey: "provider:jira", instanceKey: effectiveProjectKey.toLowerCase(), name: "Jira", category: "planning", state: "connected", notes: `Imported ${issues.length} issue(s) for ${effectiveProjectKey}.`, endpointName: `Project ${effectiveProjectKey}`, endpointUrl: body.jiraUrl || base, url: body.jiraUrl || base });
     }
 
     if (selectedSources.includes("github") && body.repoUrl) {
-      bundle.integrations.push({ id: `integration_github_${projectName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`, name: "GitHub", category: "source-control", state: "connected", notes: "Repository source selected in project upload.", url: body.repoUrl });
+      bundle.integrations.push({ id: `integration_github_${projectName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`, canonicalKey: "provider:github", name: "GitHub", category: "source-control", state: "connected", notes: "Repository source selected in project upload.", endpointName: "Repository", endpointUrl: body.repoUrl, url: body.repoUrl });
     }
 
     if (selectedSources.includes("hosting") && body.hostingUrl) {
-      bundle.integrations.push({ id: `integration_hosting_${String(body.hostingProvider || "custom").toLowerCase()}`, name: String(body.hostingProvider || "hosting").toUpperCase(), category: body.hostingProvider === "supabase" ? "backend" : "deployment", state: "connected", notes: "Hosting source selected in project upload.", url: body.hostingUrl });
+      bundle.integrations.push({ id: `integration_hosting_${String(body.hostingProvider || "custom").toLowerCase()}`, canonicalKey: body.hostingProvider === "vercel" ? "provider:vercel" : undefined, name: String(body.hostingProvider || "hosting").toUpperCase(), category: body.hostingProvider === "supabase" ? "backend" : "deployment", state: "connected", notes: "Hosting source selected in project upload.", endpointName: "Environment", endpointUrl: body.hostingUrl, url: body.hostingUrl });
     }
 
     if (!bundle.integrations.find((item) => item.id === "supabase")) {
-      bundle.integrations.push({ id: "supabase", name: "Supabase", category: "backend", state: "planned", notes: "Shared backend should be reviewed and linked during project bootstrap." });
+      bundle.integrations.push({ id: "supabase", canonicalKey: "provider:supabase", name: "Supabase", category: "backend", state: "planned", notes: "Shared backend should be reviewed and linked during project bootstrap." });
     }
 
     return NextResponse.json({

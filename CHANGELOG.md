@@ -560,3 +560,23 @@ _Forrás: `CHANGELOG.md`_
 - Release detail page now reads the merged governed project state instead of seed-only data, so approved/imported runtime releases can be opened reliably.
 - Automation page now resolves project state through the runtime project hook instead of seed-only lookup.
 - Mobile navigation keeps a direct `Project` quick button while preserving access to Import and Automation.
+## [1.0.4] - 2026-04-07
+
+### Added
+- Introduced a shared Integrations module utility (`lib/integrations.ts`) that standardizes canonical integration identity, inventory deduplication, category grouping, and normalized integration testing behavior across projects.
+- Added a project-scoped Integrations test API route (`/api/projects/[projectId]/integrations/test`) supporting single-card and test-all execution with per-item results.
+- Added versioning artifacts for this delivery:
+  - `versioning/v1.0.4_26040701_business-request-summary.md`
+  - `versioning/v1.0.4_26040701_business-request-summary.pdf`
+  - `versioning/v1.0.4_26040701_ai-dev-prompt.md`
+  - `versioning/v1.0.4_26040701_final-coder-prompt.md`
+
+### Changed
+- Integrations UI now renders canonical inventory cards only once (unless explicitly separated by `instanceKey`), grouped under explicit category sections with stable ordering.
+- Integration contract now includes endpoint metadata (`endpointName`, `endpointUrl`, `resourceLocation`) and normalized test result fields.
+- Integrations page now includes both per-card "Test integration" and page-level "Test all" actions with explicit loading/success/failure feedback.
+- Project override merge/import logic now applies shared canonical integration deduplication instead of id-only dedupe.
+
+### Fixed
+- Removed silent integration test failures by exposing explicit error states per-card and for bulk runs.
+- HTTP integration checks now capture actual status codes and classify 2xx as success; non-HTTP/no-endpoint checks now return readable operational failures.

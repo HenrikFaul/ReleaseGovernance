@@ -633,3 +633,7 @@ _Első azonosított forrásidő: 2026-04-06 | Forrásvonal: jelen fejlesztési k
 - **Ellenőrzés:** approve/import után az új release detail oldala közvetlen linken is megnyitható legyen.
 
 _Első azonosított forrásidő: 2026-04-06 | Forrásvonal: jelen fejlesztési kör_
+
+## 2026-04-07 — Integrations module governance lesson
+- Canonical identity based deduplication (`canonicalKey`) should be shared module logic for integrations to prevent duplicate provider cards across project seeds and imported overrides.
+- Integration testing contracts should always normalize HTTP vs operational outcomes into machine-readable fields (`testMode`, `reachable`, `httpStatusCode`, `normalizedStatus`, `errorKind`, `errorMessage`, `checkedAt`).

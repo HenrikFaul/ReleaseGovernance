@@ -1,6 +1,7 @@
 "use client";
 
 import { getProject } from "@/lib/mock-data";
+import { getIntegrationCanonicalKey, normalizeIntegrationInventory } from "@/lib/integrations";
 import {
   BackfillCandidate,
   CapabilityRecord,
@@ -24,6 +25,11 @@ const dedupe = <T extends { id?: string }>(items: T[]) => {
     seen.add(id);
     return true;
   });
+};
+
+const dedupeIntegrations = (items: ProjectRecord["integrations"]) => {
+  const withCanonical = items.map((item) => ({ ...item, canonicalKey: item.canonicalKey ?? getIntegrationCanonicalKey(item) }));
+  return normalizeIntegrationInventory(withCanonical);
 };
 
 const dedupeJira = (items: ImportedJiraIssue[]) => {
@@ -145,7 +151,7 @@ export function applyImportBundle(projectId: string, bundle: ProjectImportBundle
     ...current,
     releases: dedupe([...(current.releases ?? []), ...bundle.releases]),
     capabilities: dedupe([...(current.capabilities ?? []), ...bundle.capabilities]),
-    integrations: dedupe([...(current.integrations ?? []), ...bundle.integrations]),
+    integrations: dedupeIntegrations([...(current.integrations ?? []), ...bundle.integrations]),
     importedJiraIssues: dedupeJira([...(current.importedJiraIssues ?? []), ...bundle.importedJiraIssues]),
   });
 }
@@ -187,7 +193,7 @@ export function mergeProjectWithOverrides(projectId: string): ProjectRecord | un
     ...base,
     releases: dedupe([...(base.releases ?? []), ...(current.releases ?? [])]),
     capabilities: dedupe([...(base.capabilities ?? []), ...(current.capabilities ?? []), ...derivedCapabilities]),
-    integrations: dedupe([...(base.integrations ?? []), ...(current.integrations ?? [])]),
+    integrations: dedupeIntegrations([...(base.integrations ?? []), ...(current.integrations ?? [])]),
     importedJiraIssues,
     backfillCandidates: dedupeBackfills([...(base.backfillCandidates ?? []), ...(current.backfillCandidates ?? [])]),
     releaseCandidates: dedupeCandidates([...(base.releaseCandidates ?? []), ...(current.releaseCandidates ?? [])]),
