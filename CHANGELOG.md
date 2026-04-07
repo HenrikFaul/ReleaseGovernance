@@ -580,3 +580,31 @@ _Forrás: `CHANGELOG.md`_
 ### Fixed
 - Removed silent integration test failures by exposing explicit error states per-card and for bulk runs.
 - HTTP integration checks now capture actual status codes and classify 2xx as success; non-HTTP/no-endpoint checks now return readable operational failures.
+
+## [1.0.5] - 2026-04-08
+
+### Added
+- New versioning artifacts for the redesign / repair package:
+  - `versioning/business_request_01000001.pdf`
+  - `versioning/ai_dev_prompt_01000001.md`
+- Project dashboard now renders a tri-dashboard architecture on one main page with Release Group, Capabilities Group and Integrations Group sections.
+- Each dashboard group now uses a shared open/collapse interaction pattern and keeps mobile cards in a 2-column layout.
+- Release Center rows now expand inline to show changelog context, full deployment comments and mapped Jira issues.
+
+### Changed
+- Header cleanup preserved the centered active project name and right-aligned warning badge while restoring a visible mobile project quick-access action.
+- Release list rows now follow a denser Vercel-style registry layout with version, platform, status, timestamp, source, ticket number, deployment comment and Jira status.
+- Push to Jira preview now uses current Jira issue context when credentials are present, not only previously imported seed issues.
+
+### Fixed
+- Release auto-detection no longer depends on hosting settings only; repository polling can surface new candidates even when hosting configuration is incomplete.
+- Same-day commit detection no longer gets suppressed by unsafe string comparison on release dates.
+- Jira apply now writes back linked release rows without wiping the rest of the runtime override state.
+- CSV export continues to prioritize unresolved backfill candidates and only falls back to Jira-less release rows when that backlog source is empty.
+
+### Validation checklist
+- [x] Mobile dashboard cards remain 2-column.
+- [x] Header cleanup did not remove project selector / workspace access.
+- [x] Push to Jira remains reachable near release/backfill actions.
+- [x] Repo-specific lessons were appended to `codingLessonsLearnt.local.md`.
+- [x] `npm run typecheck` passes after the changes.

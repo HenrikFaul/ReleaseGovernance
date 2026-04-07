@@ -17,25 +17,19 @@ type NavItem = {
 };
 
 function navClass(active: boolean) {
-  return [
-    "nav-link",
-    active ? "nav-link-active" : "",
-  ].join(" ").trim();
+  return ["nav-link", active ? "nav-link-active" : ""].join(" ").trim();
 }
 
 function mobileNavClass(active: boolean) {
-  return [
-    "mobile-bottom-item",
-    active ? "mobile-bottom-item-active" : "",
-  ].join(" ").trim();
+  return ["mobile-bottom-item", active ? "mobile-bottom-item-active" : ""].join(" ").trim();
 }
 
 function resolveSectionLabel(pathname: string, projectId?: string) {
   if (!projectId) return "Workspace";
   if (pathname === `/projects/${projectId}`) return "Project dashboard";
-  if (pathname.includes("/releases")) return "Release dashboard";
-  if (pathname.includes("/capabilities")) return "Capabilities dashboard";
-  if (pathname.includes("/integrations")) return "Integrations dashboard";
+  if (pathname.includes("/releases")) return "Release center";
+  if (pathname.includes("/capabilities")) return "Capabilities";
+  if (pathname.includes("/integrations")) return "Integrations";
   if (pathname.includes("/traceability")) return "Traceability";
   if (pathname.includes("/import")) return "Import studio";
   if (pathname.includes("/automation")) return "Automation";
@@ -53,9 +47,7 @@ export function AppShell({ children, projectId }: AppShellProps) {
   const activeName = project?.name ?? "Projects";
   const sectionLabel = resolveSectionLabel(pathname, projectId);
 
-  const workspaceNav: NavItem[] = [
-    { href: "/projects", label: "Projects", shortLabel: "Projects" },
-  ];
+  const workspaceNav: NavItem[] = [{ href: "/projects", label: "Projects", shortLabel: "Projects" }];
 
   const projectNav: NavItem[] = projectId
     ? [
@@ -169,13 +161,20 @@ export function AppShell({ children, projectId }: AppShellProps) {
                 <div className="truncate text-2xl font-semibold text-slate-950 md:text-4xl">{activeName}</div>
               </div>
               <div className="flex justify-start md:justify-end">
-                {project ? (
-                  <span className="badge badge-warning">{project.deploymentStatus ?? "warning"}</span>
-                ) : (
-                  <span className="badge badge-info">workspace</span>
-                )}
+                {project ? <span className="badge badge-warning">{project.deploymentStatus ?? "warning"}</span> : <span className="badge badge-info">workspace</span>}
               </div>
             </div>
+
+            {project ? (
+              <div className="mt-3 flex flex-wrap gap-2 lg:hidden">
+                <Link href="/projects" className="nav-link-mobile">
+                  Projects
+                </Link>
+                <Link href={`/projects/${project.id}`} className={`nav-link-mobile ${pathname === `/projects/${project.id}` ? "nav-link-mobile-active" : ""}`}>
+                  Project quick access
+                </Link>
+              </div>
+            ) : null}
           </div>
 
           <div>{children}</div>

@@ -50,68 +50,45 @@ function inferSurfaces(text: string): Surface[] {
   return Array.from(new Set(surfaces));
 }
 
+function parseComparisonTimestamp(value?: string) {
+  if (!value) return undefined;
+  const normalized = /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00:00Z` : value;
+  const parsed = new Date(normalized);
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+}
+
+function githubHeaders(token?: string) {
+  return { Accept: "application/vnd.github+json", "User-Agent": "releasegovernance", ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const { repoUrl, latestReleaseDate } = await request.json();
+    const { repoUrl, latestReleaseDate, githubToken } = await request.json();
     if (!repoUrl) return NextResponse.json({ error: "repoUrl is required." }, { status: 400 });
     const { owner, repo } = parseRepo(repoUrl);
-
-    const repoRes = await fetch(`https://api.github.com/repos/${owner}/${repo}`, {
-      headers: { Accept: "application/vnd.github+json", "User-Agent": "releasegovernance" },
-      cache: "no-store",
-    });
+    const repoRes = await fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers: githubHeaders(githubToken), cache: "no-store" });
     if (!repoRes.ok) throw new Error(`GitHub repo lookup failed (${repoRes.status}).`);
     const repoData: any = await repoRes.json();
     const branch = repoData.default_branch || "main";
-
-    const commitRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/commits/${branch}`, {
-      headers: { Accept: "application/vnd.github+json", "User-Agent": "releasegovernance" },
-      cache: "no-store",
-    });
+    const commitRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/commits/${branch}`, { headers: githubHeaders(githubToken), cache: "no-store" });
     if (!commitRes.ok) throw new Error(`GitHub commit lookup failed (${commitRes.status}).`);
     const commitData: any = await commitRes.json();
     const commitDate = commitData.commit?.committer?.date ?? new Date().toISOString();
-
-    if (latestReleaseDate && commitDate.slice(0, 10) <= latestReleaseDate) {
-      return NextResponse.json({ candidate: null });
-    }
-
+    const releaseTimestamp = parseComparisonTimestamp(latestReleaseDate);
+    const commitTimestamp = parseComparisonTimestamp(commitDate);
+    if (releaseTimestamp && commitTimestamp && commitTimestamp <= releaseTimestamp) return NextResponse.json({ candidate: null });
     let changelog: ReleaseChangelog | undefined;
     for (const candidatePath of ["CHANGELOG.md", "changelog.md"]) {
       const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${candidatePath}`;
-      const rawRes = await fetch(rawUrl, { cache: "no-store" });
+      const rawRes = await fetch(rawUrl, { cache: "no-store", headers: githubToken ? { Authorization: `Bearer ${githubToken}` } : undefined });
       if (rawRes.ok) {
         const text = await rawRes.text();
         changelog = parseLatestChangelog(text);
         if (changelog) break;
       }
     }
-
     const textSeed = `${commitData.commit?.message ?? ""} ${changelog?.title ?? ""} ${(changelog?.excerpt ?? []).join(" ")}`;
-    const candidate: ReleaseCandidate = {
-      id: `candidate_${commitData.sha.slice(0, 7)}`,
-      version: deriveVersion(changelog, commitDate, commitData.sha),
-      surfaces: inferSurfaces(textSeed),
-      detectedAt: commitDate,
-      backendChanged: /backend|schema|supabase|data/i.test(textSeed),
-      sharedContractChanged: /contract|payload|schema|shared/i.test(textSeed),
-      schemaChanged: /schema|migration|column|table/i.test(textSeed),
-      integrationsChanged: inferIntegrations(textSeed),
-      releaseNotes: changelog?.excerpt?.[0] ?? commitData.commit?.message ?? "Latest commit detected.",
-      deploymentComment: commitData.commit?.message ?? "Latest GitHub commit detected.",
-      changelog,
-      commitMessage: commitData.commit?.message,
-      commitUrl: commitData.html_url,
-      source: {
-        kind: "github",
-        owner,
-        repository: repo,
-        ref: commitData.sha,
-        url: commitData.html_url,
-        label: `GitHub / ${owner}/${repo}`,
-      },
-    };
-
+    const candidate: ReleaseCandidate = { id: `candidate_${commitData.sha.slice(0, 7)}`, version: deriveVersion(changelog, commitDate, commitData.sha), surfaces: inferSurfaces(textSeed), detectedAt: commitDate, backendChanged: /backend|schema|supabase|data/i.test(textSeed), sharedContractChanged: /contract|payload|schema|shared/i.test(textSeed), schemaChanged: /schema|migration|column|table/i.test(textSeed), integrationsChanged: inferIntegrations(textSeed), releaseNotes: changelog?.excerpt?.[0] ?? commitData.commit?.message ?? "Latest commit detected.", deploymentComment: commitData.commit?.message ?? "Latest GitHub commit detected.", changelog, commitMessage: commitData.commit?.message, commitUrl: commitData.html_url, source: { kind: "github", owner, repository: repo, ref: commitData.sha, url: commitData.html_url, label: `GitHub / ${owner}/${repo}` } };
     return NextResponse.json({ candidate });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Release detection failed." }, { status: 500 });
