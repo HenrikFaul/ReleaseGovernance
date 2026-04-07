@@ -1,5 +1,6 @@
 import * as XLSX from "xlsx";
 import { CapabilityRecord, ImportedJiraIssue, IntegrationRef, JiraLink, ProjectImportBundle, ReleaseItem, Surface } from "@/lib/types";
+import { getIntegrationCanonicalKey } from "@/lib/integrations";
 
 export const CANONICAL_COLUMNS = ["record_type","record_id","parent_release_version","name","description","state","shipped_at","surfaces","backend_changed","shared_contract_changed","schema_changed","integrations","jira_keys","jira_summary","jira_description","jira_labels","jira_url","parity_status","environment_sensitive","notes","channel","tenant"] as const;
 
@@ -76,7 +77,8 @@ function buildIntegrationsFromCaps(caps: CapabilityRecord[]): IntegrationRef[] {
   const ids = Array.from(new Set(caps.flatMap((c) => c.integrations)));
   return ids.map((id) => {
     const found = Object.values(catalog).find((x) => x.id === id);
-    return { id, name: found?.name ?? id, category: (found?.category ?? "external-api") as any, state: (found?.state ?? "connected") as any, environmentSensitive: found?.environmentSensitive, notes: found?.notes };
+    const entry = { id, name: found?.name ?? id, category: (found?.category ?? "external-api") as any, state: (found?.state ?? "connected") as any, environmentSensitive: found?.environmentSensitive, notes: found?.notes } satisfies IntegrationRef;
+    return { ...entry, canonicalKey: getIntegrationCanonicalKey(entry) };
   });
 }
 function buildHeuristicReleases(caps: CapabilityRecord[]): ReleaseItem[] {
@@ -160,7 +162,10 @@ function parseCanonicalRows(rows: Record<string,string>[]): ProjectImportBundle 
     const type = String(row.record_type || "").trim().toLowerCase();
     if (type === "release") releases.push({ id: row.record_id || slugify(row.name || "release"), version: row.name || row.record_id || "release", releaseState: row.state === "unreleased" ? "unreleased" : "released", surfaces: splitList(row.surfaces).map((s) => surfaceMap[s.toLowerCase()]).filter(Boolean) as Surface[], shippedAt: row.shipped_at || "Unknown", backendChanged: parseBool(row.backend_changed), sharedContractChanged: parseBool(row.shared_contract_changed), schemaChanged: parseBool(row.schema_changed), integrationsChanged: splitList(row.integrations).map(slugify), jiraBackfillRequired: false, deliveredCapabilities: [], releaseNotes: row.description || "", jiraLinks: jiraKeys(String(row.jira_keys || "")).map((key) => ({ key, summary: row.jira_summary || "Imported release linkage", status: "Imported", url: row.jira_url || `https://hobbeast.atlassian.net/browse/${key}` })) });
     if (type === "capability") capabilities.push({ id: row.record_id || slugify(row.name || "capability"), name: row.name || row.record_id || "Capability", description: row.description || "", statusBySurface: { web: row.status_web as any, "mobile-android": row.status_mobile_android as any, "mobile-ios": row.status_mobile_ios as any, backend: row.status_backend as any, "shared-contract": row.status_shared_contract as any }, parityStatus: (row.parity_status as any) || "planned", integrations: splitList(row.integrations).map(slugify), jiraKeys: jiraKeys(String(row.jira_keys || "")), source: "file-import" });
-    if (type === "integration") integrations.push({ id: row.record_id || slugify(row.name || "integration"), name: row.name || row.record_id || "Integration", category: (row.integration_category as any) || "external-api", state: (row.state as any) || "connected", environmentSensitive: parseBool(row.environment_sensitive), notes: row.notes, url: (row as any).url });
+    if (type === "integration") {
+      const integration = { id: row.record_id || slugify(row.name || "integration"), name: row.name || row.record_id || "Integration", category: (row.integration_category as any) || "external-api", state: (row.state as any) || "connected", environmentSensitive: parseBool(row.environment_sensitive), notes: row.notes, url: (row as any).url, endpointName: (row as any).endpoint_name, endpointUrl: (row as any).endpoint_url, resourceLocation: (row as any).resource_location } satisfies IntegrationRef;
+      integrations.push({ ...integration, canonicalKey: getIntegrationCanonicalKey(integration) });
+    }
     if (type === "jira") {
       const key = row.record_id || jiraKeys(String(row.jira_keys || row.name || ""))[0]; if (!key) continue;
       importedJiraIssues.push({ id: `jira_${key.toLowerCase()}`, key, summary: row.jira_summary || row.name || key, description: row.jira_description || row.description || "", labels: splitList(row.jira_labels), url: row.jira_url || `https://hobbeast.atlassian.net/browse/${key}`, source: "file-import" });

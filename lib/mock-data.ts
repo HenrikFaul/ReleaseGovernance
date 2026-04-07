@@ -22,9 +22,9 @@ const hobbeastProject: ProjectRecord = {
   ],
   integrations: [
     { id: "github", name: "GitHub", category: "source-control", state: "connected", notes: "Web and Android repositories linked" },
-    { id: "jira", name: "Jira", category: "planning", state: "connected", notes: "Project HOB used for product implementation tracking" },
+    { id: "jira", name: "Jira", canonicalKey: "provider:jira", category: "planning", state: "connected", notes: "Project HOB used for product implementation tracking" },
     { id: "vercel", name: "Vercel", category: "deployment", state: "connected", notes: "Previews and environments used for web release visibility" },
-    { id: "supabase", name: "Supabase", category: "backend", state: "connected", environmentSensitive: true, notes: "Shared backend and migrations are central to parity" },
+    { id: "supabase", name: "Supabase", canonicalKey: "provider:supabase", category: "backend", state: "connected", environmentSensitive: true, notes: "Shared backend and migrations are central to parity" },
     { id: "geoapify", name: "Geoapify", category: "external-api", state: "connected", environmentSensitive: true, notes: "Primary places provider" },
     { id: "tomtom", name: "TomTom", category: "external-api", state: "attention", environmentSensitive: true, notes: "Fallback provider, requires key and parity review" },
     { id: "mapy", name: "Mapy.cz", category: "external-api", state: "connected", environmentSensitive: true, notes: "Route and map context" },
@@ -105,10 +105,10 @@ const syncfolkProject: ProjectRecord = {
     { id: "enterprise_security_parity", name: "Enterprise security, privacy and parity", description: "Security/privacy rules, wireframe appendix and mobile parity backlog depth.", statusBySurface: { web: "planned", backend: "planned", "shared-contract": "planned", "mobile-android": "planned", "mobile-ios": "planned" }, parityStatus: "planned", integrations: ["jira"], jiraKeys: ["SYN-174","SYN-175","SYN-180","SYN-188","SYN-192"], firstRelease: { web: "enterprise-audit-compliance-v0.1.0" } }
   ],
   integrations: [
-    { id: "github", name: "GitHub", category: "source-control", state: "attention", notes: "Governance seed is based on uploaded Syncfolk markdown inventories and repository snapshots; direct repo linkage can be wired later." },
-    { id: "jira", name: "Jira", category: "planning", state: "connected", notes: "Project SYN tracks both the current B2C surface and the enterprise backlog." },
-    { id: "vercel", name: "Vercel", category: "deployment", state: "planned", notes: "Live deployment evidence exists in the inventories, but no direct release endpoint is wired yet." },
-    { id: "supabase", name: "Supabase", category: "backend", state: "connected", environmentSensitive: true, notes: "Supabase Auth, Postgres and Edge Functions are the current backend backbone of Syncfolk." },
+    { id: "github", name: "GitHub", canonicalKey: "provider:github", category: "source-control", state: "attention", notes: "Governance seed is based on uploaded Syncfolk markdown inventories and repository snapshots; direct repo linkage can be wired later.", endpointName: "Repository", endpointUrl: "https://github.com/HenrikFaul/syncfolk" },
+    { id: "jira", name: "Jira", canonicalKey: "provider:jira", category: "planning", state: "connected", notes: "Project SYN tracks both the current B2C surface and the enterprise backlog." },
+    { id: "vercel", name: "Vercel", canonicalKey: "provider:vercel", category: "deployment", state: "planned", notes: "Live deployment evidence exists in the inventories, but no direct release endpoint is wired yet.", endpointName: "Deployment URL", endpointUrl: "https://syncfolk.com" },
+    { id: "supabase", name: "Supabase", canonicalKey: "provider:supabase", category: "backend", state: "connected", environmentSensitive: true, notes: "Supabase Auth, Postgres and Edge Functions are the current backend backbone of Syncfolk." },
     { id: "google-oauth", name: "Google OAuth", category: "external-api", state: "connected", environmentSensitive: true, notes: "Google sign-in and upgrade paths are described as part of the implemented identity surface." },
     { id: "email-social-share", name: "Email and social share deep links", category: "external-api", state: "connected", notes: "Email, Telegram, WhatsApp and other deep-link share flows are part of the shipped B2C surface." },
     { id: "join-event-fn", name: "Supabase Edge Function: join-event", category: "backend", state: "connected", environmentSensitive: true, notes: "Critical for token-based joining, anonymous access, guest flows and temporary return paths." },
@@ -214,10 +214,10 @@ const releaseGovernanceProject: ProjectRecord = {
     { id: "push_to_jira", name: "Push to Jira", description: "Suggest and apply Jira issue creation/update from selected deploy rows with editable preview.", statusBySurface: { web: "planned", backend: "planned" }, parityStatus: "planned", integrations: ["jira"], jiraKeys: ["RLG-6"] }
   ],
   integrations: [
-    { id: "github", name: "GitHub", category: "source-control", state: "connected", notes: "ReleaseGovernance repo is the current code source." },
-    { id: "jira", name: "Jira", category: "planning", state: "connected", notes: "RLG project tracks ReleaseGovernance backlog and traceability." },
-    { id: "vercel", name: "Vercel", category: "deployment", state: "connected", notes: "Deployment surface used for ReleaseGovernance hosting." },
-    { id: "supabase", name: "Supabase", category: "backend", state: "planned", environmentSensitive: true, notes: "Planned live governance persistence backend." },
+    { id: "github", name: "GitHub", canonicalKey: "provider:github", category: "source-control", state: "connected", notes: "ReleaseGovernance repo is the current code source.", endpointName: "Repository", endpointUrl: "https://github.com/HenrikFaul/ReleaseGovernance" },
+    { id: "jira", name: "Jira", canonicalKey: "provider:jira", category: "planning", state: "connected", notes: "RLG project tracks ReleaseGovernance backlog and traceability." },
+    { id: "vercel", name: "Vercel", canonicalKey: "provider:vercel", category: "deployment", state: "connected", notes: "Deployment surface used for ReleaseGovernance hosting.", endpointName: "Production", endpointUrl: "https://www.releasegovernance.dev/projects" },
+    { id: "supabase", name: "Supabase", canonicalKey: "provider:supabase", category: "backend", state: "planned", environmentSensitive: true, notes: "Planned live governance persistence backend." },
     { id: "markdown", name: "Markdown inventories", category: "documentation", state: "connected", notes: "Project bootstrap and release narratives can be imported from Markdown." },
     { id: "excel", name: "Excel / CSV imports", category: "documentation", state: "connected", notes: "Canonical import templates are available for structured project intake." }
   ],

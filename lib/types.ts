@@ -28,14 +28,30 @@ export interface ImportedJiraIssue {
   created?: string;
 }
 
+export interface IntegrationTestResult {
+  testMode: "single" | "all";
+  reachable: boolean;
+  httpStatusCode?: number;
+  normalizedStatus: "success" | "failure";
+  errorKind?: "http" | "network" | "operational";
+  errorMessage?: string;
+  checkedAt: string;
+}
+
 export interface IntegrationRef {
   id: string;
   name: string;
+  canonicalKey?: string;
+  instanceKey?: string;
   category: "source-control" | "planning" | "deployment" | "backend" | "external-api" | "design" | "documentation";
   state: "connected" | "attention" | "planned";
   environmentSensitive?: boolean;
   notes?: string;
+  endpointName?: string;
+  endpointUrl?: string;
+  resourceLocation?: string;
   url?: string;
+  lastTestResult?: IntegrationTestResult;
 }
 
 export interface ReleaseSource {

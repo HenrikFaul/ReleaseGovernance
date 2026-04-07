@@ -1,0 +1,105 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+5 0 obj
+<< /Length 2253 >>
+stream
+BT
+/F1 10 Tf
+50 790 Td
+12 TL
+(# v1.0.4_26040701  Business request summary) Tj
+T*
+() Tj
+T*
+(## Scope) Tj
+T*
+(- Module: `Integrations` only.) Tj
+T*
+(- Affected routes/components/services/state/contracts:) Tj
+T*
+(  - `app/projects/[projectId]/integrations/page.tsx`) Tj
+T*
+(  - `app/api/projects/[projectId]/integrations/test/route.ts`) Tj
+T*
+(  - `lib/integrations.ts`) Tj
+T*
+(  - `lib/project-overrides.ts`) Tj
+T*
+(  - `lib/types.ts`) Tj
+T*
+(  - `lib/import-utils.ts`) Tj
+T*
+(  - `app/api/project-upload/preview/route.ts`) Tj
+T*
+(  - `lib/mock-data.ts`) Tj
+T*
+() Tj
+T*
+(## Structured implementation commands) Tj
+T*
+(- CMD-ARCH-001/CMD-ARCH-002: Centralized integration normalization/grouping/testing logic in shared `lib/integ) Tj
+T*
+(- CMD-MODEL-001/CMD-MODEL-002/CMD-MODEL-003: Extended `IntegrationRef` with canonical identity fields and endp) Tj
+T*
+(- CMD-BACKEND-001/CMD-BACKEND-002: Added normalized test result contract [`testMode`, `reachable`, `httpStatus) Tj
+T*
+(- CMD-UI-001/CMD-UI-002/CMD-UI-003/CMD-UI-004/CMD-UI-005/CMD-UI-006: Integrations UI now deduplicates canonica) Tj
+T*
+(- CMD-VALIDATE-001: Added validation steps for dedupe/grouping/per-item/bulk tests/status/error metadata/cross) Tj
+T*
+() Tj
+T*
+(## Acceptance criteria mapping) Tj
+T*
+(- TEST-001: Canonical dedupe + optional instance-level separation via `instanceKey`.) Tj
+T*
+(- TEST-002: Every card belongs to one explicit category section from the model field.) Tj
+T*
+(- TEST-003: Per-card test action with visible loading/success/failure.) Tj
+T*
+(- TEST-004: Test-all returns independent results per integration card.) Tj
+T*
+(- TEST-005: HTTP checks expose real status code and 2xx=>success.) Tj
+T*
+(- TEST-006: Non-HTTP/unconfigured endpoints return readable operational failure messages.) Tj
+T*
+(- TEST-007: Endpoint/resource metadata rendered as clickable links when meaningful.) Tj
+T*
+(- TEST-008: Shared module behavior enforced by centralized `lib/integrations.ts` usage across project contexts) Tj
+T*
+() Tj
+T*
+(## Regression guards) Tj
+T*
+(- Preserve non-Integrations modules and keep generator/compare/repo-validation actions untouched.) Tj
+T*
+(- Keep changelog and lessons append-only.) Tj
+T*
+(- Maintain mobile-friendly card grid and visible critical actions.) Tj
+ET
+endstream
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000000311 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+2616
+%%EOF
